@@ -1,0 +1,6 @@
+Build/
+DerivedData/
+*.xcworkspace
+*.xcuserdata
+Pods/
+
