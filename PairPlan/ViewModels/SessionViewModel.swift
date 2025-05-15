@@ -7,12 +7,16 @@ class SessionViewModel: ObservableObject {
     @Published var errorMessage:String?
     @Published var mode:        SessionMode = .shared
 
-    // храним идентификатор клиента в UserDefaults
+    // MARK: — Identity
     private let userIdKey = "PairPlan.currentUserId"
     private(set) var currentUserId: String
 
+    // MARK: — Recent Sessions
+    private let recentSessionsKey = "PairPlan.recentSessions"
+    @Published var recentSessions: [String] = []
+
     init() {
-        // либо читаем сохранённый, либо создаём новый
+        // При первом запуске сохраняем UUID, затем читаем его при каждом старте
         if let saved = UserDefaults.standard.string(forKey: userIdKey) {
             currentUserId = saved
         } else {
@@ -20,19 +24,28 @@ class SessionViewModel: ObservableObject {
             UserDefaults.standard.set(newId, forKey: userIdKey)
             currentUserId = newId
         }
+        // Load recent sessions
+        if let saved = UserDefaults.standard.array(forKey: recentSessionsKey) as? [String] {
+            recentSessions = saved
+        }
     }
 
-    /// Создать новую сессию и сразу зарегистрироваться в ней
+    // MARK: — Session lifecycle
+
+    /// Создать новую сессию и зарегистрировать в ней этого пользователя
     func createSession(mode: SessionMode) {
-        let code = String((0..<6).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
+        let code = String((0..<6).map { _ in
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()!
+        })
         self.mode = mode
+        // 1) Создаём сессию в Firestore
         FirestoreManager.shared.createSession(code: code, mode: mode) { error in
             DispatchQueue.main.async {
                 if let err = error {
                     self.errorMessage = err.localizedDescription
                     return
                 }
-                // Пробуем добавить себя как участника
+                // 2) Пытаемся добавить себя в participants
                 FirestoreManager.shared.addParticipant(
                     sessionCode: code,
                     userId: self.currentUserId,
@@ -46,6 +59,7 @@ class SessionViewModel: ObservableObject {
                         } else {
                             self.sessionCode = code
                             self.joined = true
+                            self.addRecentSession(code)
                         }
                     }
                 }
@@ -53,21 +67,21 @@ class SessionViewModel: ObservableObject {
         }
     }
 
-    /// Попытка присоединиться к существующей сессии
+    /// Присоединиться к уже существующей сессии по коду
     func joinSession(code: String) {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             self.errorMessage = "Поле не может быть пустым"
             return
         }
-        // Сначала проверяем, что сессия есть
+        // 1) Проверяем, что сессия существует
         FirestoreManager.shared.sessionExists(code: trimmed) { exists in
             DispatchQueue.main.async {
                 guard exists else {
                     self.errorMessage = "Сессия не найдена"
                     return
                 }
-                // Подгружаем режим работы
+                // 2) Загружаем её режим работы
                 FirestoreManager.shared.loadSessionMode(code: trimmed) { loadedMode in
                     DispatchQueue.main.async {
                         guard let m = loadedMode else {
@@ -75,7 +89,7 @@ class SessionViewModel: ObservableObject {
                             return
                         }
                         self.mode = m
-                        // Регистрируем участника
+                        // 3) Пытаемся добавить себя в participants
                         FirestoreManager.shared.addParticipant(
                             sessionCode: trimmed,
                             userId: self.currentUserId,
@@ -89,6 +103,7 @@ class SessionViewModel: ObservableObject {
                                 } else {
                                     self.sessionCode = trimmed
                                     self.joined = true
+                                    self.addRecentSession(trimmed)
                                 }
                             }
                         }
@@ -96,5 +111,38 @@ class SessionViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Выход из текущей сессии — удаляет участника из Firestore и возвращает на экран входа
+    func leaveSession() {
+        let code = sessionCode
+        let userId = currentUserId
+        FirestoreManager.shared.removeParticipant(sessionCode: code, userId: userId) { [weak self] error in
+            DispatchQueue.main.async {
+                // Optionally handle error
+                self?.sessionCode  = ""
+                self?.joined       = false
+                self?.mode         = .shared
+                self?.errorMessage = nil
+            }
+        }
+    }
+
+    // MARK: — Recent Sessions Logic
+    func addRecentSession(_ code: String) {
+        var set = Set(recentSessions)
+        set.insert(code)
+        recentSessions = Array(set)
+        UserDefaults.standard.set(recentSessions, forKey: recentSessionsKey)
+    }
+
+    func removeRecentSession(_ code: String) {
+        recentSessions.removeAll { $0 == code }
+        UserDefaults.standard.set(recentSessions, forKey: recentSessionsKey)
+    }
+
+    func clearRecentSessions() {
+        recentSessions = []
+        UserDefaults.standard.removeObject(forKey: recentSessionsKey)
     }
 }

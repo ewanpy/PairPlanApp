@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		2CBD5E4B2DD348E100BDAE91 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 2CBD5E4A2DD348E100BDAE91 /* FirebaseFirestore */; };
+		2CBD5E572DD3B62500BDAE91 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 2CBD5E562DD3B62500BDAE91 /* FirebaseAuth */; };
+		2CBD5E5B2DD3B73100BDAE91 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2CBD5E5A2DD3B73100BDAE91 /* FirebaseCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +72,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				2CBD5E4B2DD348E100BDAE91 /* FirebaseFirestore in Frameworks */,
+				2CBD5E5B2DD3B73100BDAE91 /* FirebaseCore in Frameworks */,
+				2CBD5E572DD3B62500BDAE91 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +135,8 @@
 			name = PairPlan;
 			packageProductDependencies = (
 				2CBD5E4A2DD348E100BDAE91 /* FirebaseFirestore */,
+				2CBD5E562DD3B62500BDAE91 /* FirebaseAuth */,
+				2CBD5E5A2DD3B73100BDAE91 /* FirebaseCore */,
 			);
 			productName = PairPlan;
 			productReference = 2CBD5E032DD3429000BDAE91 /* PairPlan.app */;
@@ -636,6 +642,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2CBD5E492DD348E100BDAE91 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		2CBD5E562DD3B62500BDAE91 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2CBD5E492DD348E100BDAE91 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		2CBD5E5A2DD3B73100BDAE91 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2CBD5E492DD348E100BDAE91 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,53 +1,54 @@
-// File: Views/AddTaskView.swift
 import SwiftUI
+import Foundation
 import PhotosUI
 
-struct AddTaskView: View {
-    @State private var title: String = ""
-    @State private var date: Date = Date()
-    @State private var useTime: Bool = false
-    @State private var selectedType: TaskType = .other
-    @State private var color: Color = .accentColor
-    @State private var descriptionText: String = ""
-    @State private var attachments: [UIImage] = []
-    @State private var repeatRule: String = "none"
-    @State private var checklist: [ChecklistItem] = []
+struct EditTaskView: View {
+    let task: Task
+    let onSave: (Task) -> Void
+    
+    @State private var title: String
+    @State private var date: Date
+    @State private var useTime: Bool
+    @State private var selectedType: TaskType
+    @State private var color: Color
+    @State private var descriptionText: String
+    @State private var attachments: [UIImage]
+    @State private var repeatRule: String
+    @State private var checklist: [ChecklistItem]
     @State private var newChecklistText: String = ""
     @State private var showImagePicker = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
-
+    
     @Environment(\.presentationMode) private var presentationMode
-    var onSave: (String, Date?, TaskType, String?, String?, [String]?, String?, [ChecklistItem]?) -> Void
-
+    
+    init(task: Task, onSave: @escaping (Task) -> Void) {
+        self.task = task
+        self.onSave = onSave
+        _title = State(initialValue: task.title)
+        _date = State(initialValue: task.timestamp ?? Date())
+        _useTime = State(initialValue: task.timestamp != nil)
+        _selectedType = State(initialValue: task.type)
+        _color = State(initialValue: Color(hex: task.color) ?? .accentColor)
+        _descriptionText = State(initialValue: task.description ?? "")
+        _attachments = State(initialValue: []) // For real app, load images from URLs
+        _repeatRule = State(initialValue: task.repeatRule ?? "none")
+        _checklist = State(initialValue: task.checklist ?? [])
+    }
+    
     var body: some View {
         NavigationView {
             Form {
-                titleSection
+                editSection
                 descriptionSection
                 attachmentsSection
                 repeatSection
                 checklistSection
                 timeSection
             }
-            .navigationBarTitle("Добавить задачу", displayMode: .inline)
+            .navigationBarTitle("Редактировать задачу", displayMode: .inline)
             .navigationBarItems(
-                leading: Button("Отмена") {
-                    presentationMode.wrappedValue.dismiss()
-                },
-                trailing: Button("Сохранить") {
-                    onSave(
-                        title,
-                        useTime ? date : nil,
-                        selectedType,
-                        color.toHex,
-                        descriptionText.isEmpty ? nil : descriptionText,
-                        nil, // Placeholder for attachments URLs
-                        repeatRule == "none" ? nil : repeatRule,
-                        checklist.isEmpty ? nil : checklist
-                    )
-                    presentationMode.wrappedValue.dismiss()
-                }
-                .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                leading: cancelButton,
+                trailing: saveButton
             )
             .photosPicker(isPresented: $showImagePicker, selection: $selectedPhotos, maxSelectionCount: 3, matching: .images)
             .onChange(of: selectedPhotos) { newItems in
@@ -59,22 +60,12 @@ struct AddTaskView: View {
                     }
                 }
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Готово") {
-                        UIApplication.shared.sendAction(
-                            #selector(UIResponder.resignFirstResponder),
-                            to: nil, from: nil, for: nil
-                        )
-                    }
-                }
-            }
+            .toolbar { keyboardToolbar }
         }
     }
-
-    private var titleSection: some View {
-        Section(header: Text("Новая задача")) {
+    
+    private var editSection: some View {
+        Section(header: Text("Редактировать задачу")) {
             TextField("Название задачи", text: $title)
             Picker("Тип задачи", selection: $selectedType) {
                 ForEach(TaskType.allCases, id: \.self) { type in
@@ -85,14 +76,14 @@ struct AddTaskView: View {
             ColorPicker("Цвет задачи", selection: $color)
         }
     }
-
+    
     private var descriptionSection: some View {
         Section(header: Text("Описание")) {
             TextEditor(text: $descriptionText)
                 .frame(minHeight: 60)
         }
     }
-
+    
     private var attachmentsSection: some View {
         Section(header: Text("Вложения")) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -114,7 +105,7 @@ struct AddTaskView: View {
             }
         }
     }
-
+    
     private var repeatSection: some View {
         Section(header: Text("Повторение")) {
             Picker("Повторять", selection: $repeatRule) {
@@ -126,7 +117,7 @@ struct AddTaskView: View {
             .pickerStyle(.segmented)
         }
     }
-
+    
     private var checklistSection: some View {
         Section(header: Text("Чеклист")) {
             ForEach(checklist) { item in
@@ -160,7 +151,7 @@ struct AddTaskView: View {
             }
         }
     }
-
+    
     private var timeSection: some View {
         Section {
             Toggle("Указать время", isOn: $useTime)
@@ -169,19 +160,39 @@ struct AddTaskView: View {
             }
         }
     }
-}
+    
+    private var cancelButton: some View {
+        Button("Отмена") {
+            presentationMode.wrappedValue.dismiss()
+        }
+    }
+    
+    private var saveButton: some View {
+        Button("Сохранить") {
+            var updatedTask = task
+            updatedTask.title = title
+            updatedTask.timestamp = useTime ? date : nil
+            updatedTask.type = selectedType
+            updatedTask.color = color.toHex
+            updatedTask.description = descriptionText.isEmpty ? nil : descriptionText
+            updatedTask.repeatRule = repeatRule == "none" ? nil : repeatRule
+            updatedTask.checklist = checklist.isEmpty ? nil : checklist
+            // For attachments, you would upload images and get URLs in a real app
+            onSave(updatedTask)
+        }
+        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+    
+    private var keyboardToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Готово") {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil, from: nil, for: nil
+                )
+            }
+        }
+    }
+} 
 
-// Helper to convert Color to hex string
-extension Color {
-    var toHex: String? {
-        UIColor(self).toHex
-    }
-}
-extension UIColor {
-    var toHex: String? {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        guard getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
-        let rgb: Int = (Int)(r*255)<<16 | (Int)(g*255)<<8 | (Int)(b*255)<<0
-        return String(format: "#%06x", rgb)
-    }
-}
