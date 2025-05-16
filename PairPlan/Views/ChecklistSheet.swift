@@ -25,14 +25,14 @@ struct ChecklistEditorView: View {
                     .disabled(newItemText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .navigationTitle("Редактировать чеклист")
+            .navigationTitle("Чеклист")
             .navigationBarItems(trailing: Button("Готово") {
                 presentationMode.wrappedValue.dismiss()
             })
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Скрыть клавиатуру") {
+                    Button("Готово") {
                         UIApplication.shared.endEditing()
                     }
                 }

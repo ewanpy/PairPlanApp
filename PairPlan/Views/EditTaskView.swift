@@ -63,7 +63,7 @@ struct EditTaskView: View {
                                     .foregroundColor(item.isCompleted ? .gray : .primary)
                             }
                         }
-                        Button("Редактировать чеклист") { showChecklistEditor = true }
+                        Button("Чеклист") { showChecklistEditor = true }
                     }
                 }
             }
