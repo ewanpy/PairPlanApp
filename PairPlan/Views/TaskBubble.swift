@@ -17,49 +17,27 @@ struct TaskBubble: View {
             Button(action: action) {
                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(task.isCompleted ? .completedColor : .textSecondary)
+                    .foregroundColor(task.isCompleted ? .green : .gray)
             }
             .buttonStyle(PlainButtonStyle())
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Image(systemName: task.type.icon)
                         .font(.caption)
-                        .foregroundColor(task.type.color)
+                        .foregroundColor(.accentColor)
                     Text(task.title)
                         .font(.body)
                         .strikethrough(task.isCompleted)
-                        .foregroundColor(task.isCompleted ? .textSecondary : .textPrimary)
+                        .foregroundColor(task.isCompleted ? .gray : .primary)
                         .lineLimit(2)
                 }
-                if let desc = task.description, !desc.isEmpty {
-                    Text(desc)
-                        .font(.caption)
-                        .foregroundColor(.textSecondary)
-                        .padding(.top, 2)
-                }
-                if let checklist = task.checklist, !checklist.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(checklist) { item in
-                            HStack(spacing: 6) {
-                                Image(systemName: item.isCompleted ? "checkmark.square.fill" : "square")
-                                    .font(.caption2)
-                                    .foregroundColor(item.isCompleted ? .accentColor : .textSecondary)
-                                Text(item.text)
-                                    .font(.caption2)
-                                    .strikethrough(item.isCompleted)
-                                    .foregroundColor(item.isCompleted ? .textSecondary : .textPrimary)
-                            }
-                        }
-                    }
-                    .padding(.top, 4)
-                }
-                if let date = task.timestamp {
+                if let date = task.timestamp as Date? {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
                         Text(date, style: .time)
                             .font(.caption2)
                     }
-                    .foregroundColor(.textSecondary)
+                    .foregroundColor(.gray)
                     .padding(.top, 4)
                 }
             }
@@ -67,12 +45,12 @@ struct TaskBubble: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.secondaryBackground)
+                    .fill(Color(.systemGray5))
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.textSecondary.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
             )
             .contextMenu {
                 if isCurrentUser {

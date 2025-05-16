@@ -3,185 +3,82 @@ import SwiftUI
 import PhotosUI
 
 struct AddTaskView: View {
-    @State private var title: String = ""
-    @State private var date: Date = Date()
-    @State private var useTime: Bool = false
-    @State private var selectedType: TaskType = .other
-    @State private var color: Color = .accentColor
+    let sessionCode: String
+    let mode: SessionMode
+    
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = AddTaskViewModel()
     @State private var descriptionText: String = ""
-    @State private var attachments: [UIImage] = []
-    @State private var repeatRule: String = "none"
+    @State private var selectedTime: Date = Date()
+    @State private var useTime: Bool = false
     @State private var checklist: [ChecklistItem] = []
-    @State private var newChecklistText: String = ""
-    @State private var showImagePicker = false
-    @State private var selectedPhotos: [PhotosPickerItem] = []
-
-    @Environment(\.presentationMode) private var presentationMode
-    var onSave: (String, Date?, TaskType, String?, String?, [String]?, String?, [ChecklistItem]?) -> Void
-
+    @State private var showChecklistEditor = false
+    
     var body: some View {
         NavigationView {
             Form {
-                titleSection
-                descriptionSection
-                attachmentsSection
-                repeatSection
-                checklistSection
-                timeSection
-            }
-            .navigationBarTitle("Добавить задачу", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button("Отмена") {
-                    presentationMode.wrappedValue.dismiss()
-                },
-                trailing: Button("Сохранить") {
-                    onSave(
-                        title,
-                        useTime ? date : nil,
-                        selectedType,
-                        color.toHex,
-                        descriptionText.isEmpty ? nil : descriptionText,
-                        nil, // Placeholder for attachments URLs
-                        repeatRule == "none" ? nil : repeatRule,
-                        checklist.isEmpty ? nil : checklist
-                    )
-                    presentationMode.wrappedValue.dismiss()
-                }
-                .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
-            )
-            .photosPicker(isPresented: $showImagePicker, selection: $selectedPhotos, maxSelectionCount: 3, matching: .images)
-            .onChange(of: selectedPhotos) { newItems in
-                for item in newItems {
-                    item.loadTransferable(type: Data.self) { result in
-                        if let data = try? result.get(), let image = UIImage(data: data) {
-                            attachments.append(image)
+                Section(header: Text("Детали задачи")) {
+                    TextField("Название", text: $viewModel.title)
+                    
+                    Picker("Тип", selection: $viewModel.selectedType) {
+                        ForEach(TaskType.allCases, id: \.self) { type in
+                            Label(type.description, systemImage: type.icon)
+                                .tag(type)
                         }
                     }
                 }
+                Section(header: Text("Описание")) {
+                    TextEditor(text: $descriptionText)
+                        .frame(minHeight: 60)
+                }
+                Section(header: Text("Время")) {
+                    Toggle("Установить время", isOn: $useTime)
+                    if useTime {
+                        DatePicker("Время", selection: $selectedTime, displayedComponents: [.hourAndMinute])
+                    }
+                }
+                Section(header: Text("Чеклист")) {
+                    if checklist.isEmpty {
+                        Button("Добавить чеклист") { showChecklistEditor = true }
+                    } else {
+                        ForEach(checklist) { item in
+                            HStack {
+                                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(item.isCompleted ? .green : .gray)
+                                Text(item.text)
+                                    .strikethrough(item.isCompleted)
+                                    .foregroundColor(item.isCompleted ? .gray : .primary)
+                            }
+                        }
+                        Button("Редактировать чеклист") { showChecklistEditor = true }
+                    }
+                }
             }
+            .navigationTitle("Новая задача")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Готово") {
-                        UIApplication.shared.sendAction(
-                            #selector(UIResponder.resignFirstResponder),
-                            to: nil, from: nil, for: nil
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Добавить") {
+                        viewModel.addTask(
+                            sessionCode: sessionCode,
+                            mode: mode,
+                            description: descriptionText.isEmpty ? nil : descriptionText,
+                            time: useTime ? selectedTime : nil,
+                            checklist: checklist.isEmpty ? nil : checklist
                         )
+                        dismiss()
                     }
+                    .disabled(viewModel.title.isEmpty)
                 }
             }
         }
-    }
-
-    private var titleSection: some View {
-        Section(header: Text("Новая задача")) {
-            TextField("Название задачи", text: $title)
-            Picker("Тип задачи", selection: $selectedType) {
-                ForEach(TaskType.allCases, id: \.self) { type in
-                    Label(type.rawValue, systemImage: type.icon)
-                        .tag(type)
-                }
-            }
-            ColorPicker("Цвет задачи", selection: $color)
+        .sheet(isPresented: $showChecklistEditor) {
+            ChecklistEditorView(checklist: $checklist)
         }
-    }
-
-    private var descriptionSection: some View {
-        Section(header: Text("Описание")) {
-            TextEditor(text: $descriptionText)
-                .frame(minHeight: 60)
-        }
-    }
-
-    private var attachmentsSection: some View {
-        Section(header: Text("Вложения")) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    ForEach(attachments, id: \.self) { image in
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 60, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    Button(action: { showImagePicker = true }) {
-                        Image(systemName: "plus")
-                            .frame(width: 60, height: 60)
-                            .background(Color(.systemGray5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            }
-        }
-    }
-
-    private var repeatSection: some View {
-        Section(header: Text("Повторение")) {
-            Picker("Повторять", selection: $repeatRule) {
-                Text("Нет").tag("none")
-                Text("Каждый день").tag("daily")
-                Text("Каждую неделю").tag("weekly")
-                Text("Каждый месяц").tag("monthly")
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-
-    private var checklistSection: some View {
-        Section(header: Text("Чеклист")) {
-            ForEach(checklist) { item in
-                HStack {
-                    Button(action: {
-                        if let idx = checklist.firstIndex(where: { $0.id == item.id }) {
-                            checklist[idx].isCompleted.toggle()
-                        }
-                    }) {
-                        Image(systemName: item.isCompleted ? "checkmark.square.fill" : "square")
-                            .foregroundColor(item.isCompleted ? .accentColor : .secondary)
-                    }
-                    Text(item.text)
-                    Spacer()
-                    Button(action: {
-                        checklist.removeAll { $0.id == item.id }
-                    }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
-                    }
-                }
-            }
-            HStack {
-                TextField("Добавить пункт", text: $newChecklistText)
-                Button("+") {
-                    let trimmed = newChecklistText.trimmingCharacters(in: .whitespaces)
-                    guard !trimmed.isEmpty else { return }
-                    checklist.append(ChecklistItem(text: trimmed, isCompleted: false))
-                    newChecklistText = ""
-                }
-            }
-        }
-    }
-
-    private var timeSection: some View {
-        Section {
-            Toggle("Указать время", isOn: $useTime)
-            if useTime {
-                DatePicker("Время", selection: $date, displayedComponents: .hourAndMinute)
-            }
-        }
-    }
-}
-
-// Helper to convert Color to hex string
-extension Color {
-    var toHex: String? {
-        UIColor(self).toHex
-    }
-}
-extension UIColor {
-    var toHex: String? {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        guard getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
-        let rgb: Int = (Int)(r*255)<<16 | (Int)(g*255)<<8 | (Int)(b*255)<<0
-        return String(format: "#%06x", rgb)
     }
 }
