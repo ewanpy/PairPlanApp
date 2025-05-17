@@ -12,12 +12,14 @@ struct TaskListView: View {
     @State private var editingTask: Task? = nil
     @State private var showChecklistSheet = false
     @State private var checklistTask: Task? = nil
+    @State private var selectedWeekday: Int = 1 // по умолчанию Пн
     private var currentUserId: String {
         UserDefaults.standard.string(forKey: "PairPlan.currentUserId") ?? ""
     }
     
     var body: some View {
         VStack {
+            WeekdayPicker(selectedWeekday: $selectedWeekday)
             // Task type filter (only for shared mode)
             if mode == .shared {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -50,18 +52,21 @@ struct TaskListView: View {
             }
             // Task list
             List {
-                let filteredTasks = viewModel.tasks.filter { selectedTaskTypes.contains($0.type) }
-                    .sorted {
-                        if $0.time == nil && $1.time != nil {
-                            return true
-                        } else if $0.time != nil && $1.time == nil {
-                            return false
-                        } else if let t0 = $0.time, let t1 = $1.time {
-                            return t0 < t1
-                        } else {
-                            return false
-                        }
+                let filteredTasks = viewModel.tasks.filter {
+                    $0.weekday == selectedWeekday
+                }
+                .filter { selectedTaskTypes.contains($0.type) }
+                .sorted {
+                    if $0.time == nil && $1.time != nil {
+                        return true
+                    } else if $0.time != nil && $1.time == nil {
+                        return false
+                    } else if let t0 = $0.time, let t1 = $1.time {
+                        return t0 < t1
+                    } else {
+                        return false
                     }
+                }
                 ForEach(Array(filteredTasks.enumerated()), id: \ .element.id) { index, task in
                     let prevUserId = index > 0 ? filteredTasks[index-1].userId : nil
                     TaskRow(
@@ -102,7 +107,7 @@ struct TaskListView: View {
             }
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskView(sessionCode: sessionCode, mode: mode)
+            AddTaskView(sessionCode: sessionCode, mode: mode, defaultWeekday: selectedWeekday)
         }
         .sheet(isPresented: $showEditSheet) {
             if let editingTask = editingTask {
@@ -115,13 +120,11 @@ struct TaskListView: View {
         }
         .sheet(isPresented: $showChecklistSheet) {
             if let checklistTask = checklistTask, let binding = bindingForTask(withId: checklistTask.id) {
-                ChecklistMarkView(
-                    checklist: binding,
-                    isReadOnly: checklistTask.userId != currentUserId
-                )
+                ChecklistMarkView(checklist: binding, isReadOnly: checklistTask.userId != currentUserId)
             }
         }
         .onAppear {
+            selectedWeekday = getCurrentWeekday()
             viewModel.loadTasks(for: sessionCode)
         }
     }
@@ -153,6 +156,17 @@ struct TaskListView: View {
                 FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
             }
         )
+    }
+
+    func getCurrentWeekday() -> Int {
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        return weekday == 1 ? 7 : weekday - 1 // 1=Пн, 7=Вс
+    }
+    func getCurrentWeekNumber() -> Int {
+        Calendar.current.component(.weekOfYear, from: Date())
+    }
+    func getCurrentYear() -> Int {
+        Calendar.current.component(.year, from: Date())
     }
 }
 
@@ -310,5 +324,25 @@ struct TaskRow: View {
                 }
             }
         }
+    }
+}
+
+struct WeekdayPicker: View {
+    @Binding var selectedWeekday: Int
+    let weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(1...7, id: \.self) { day in
+                Button(action: { selectedWeekday = day }) {
+                    Text(weekdays[day-1])
+                        .font(.headline)
+                        .frame(width: 40, height: 40)
+                        .background(selectedWeekday == day ? Color.accentColor : Color(.systemGray5))
+                        .foregroundColor(selectedWeekday == day ? .white : .primary)
+                        .cornerRadius(8)
+                }
+            }
+        }
+        .padding(.horizontal)
     }
 }

@@ -114,7 +114,8 @@ class FirestoreManager {
             "type": task.type.rawValue,
             "userId": task.userId,
             "timestamp": task.timestamp,
-            "isCompleted": task.isCompleted
+            "isCompleted": task.isCompleted,
+            "weekday": task.weekday
         ]
         if let description = task.description {
             taskData["description"] = description
@@ -169,12 +170,14 @@ class FirestoreManager {
                             return ChecklistItem(id: id, text: text, isCompleted: isCompleted)
                         }
                     }
+                    let weekday = data["weekday"] as? Int ?? 1
                     return Task(
                         id: id,
                         title: title,
                         type: type,
                         userId: userId,
                         timestamp: timestamp,
+                        weekday: weekday,
                         isCompleted: isCompleted,
                         description: description,
                         time: time,

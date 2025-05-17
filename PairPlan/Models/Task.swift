@@ -14,6 +14,7 @@ struct Task: Identifiable, Codable {
     var type: TaskType
     var userId: String
     var timestamp: Date
+    var weekday: Int     // 1 (Пн) - 7 (Вс)
     var isCompleted: Bool
     var description: String?
     var time: Date?
@@ -24,6 +25,7 @@ struct Task: Identifiable, Codable {
          type: TaskType,
          userId: String,
          timestamp: Date = Date(),
+         weekday: Int,
          isCompleted: Bool = false,
          description: String? = nil,
          time: Date? = nil,
@@ -33,6 +35,7 @@ struct Task: Identifiable, Codable {
         self.type = type
         self.userId = userId
         self.timestamp = timestamp
+        self.weekday = weekday
         self.isCompleted = isCompleted
         self.description = description
         self.time = time

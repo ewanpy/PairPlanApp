@@ -79,6 +79,7 @@ struct EditTaskView: View {
                         type: selectedType,
                         userId: task.userId,
                         timestamp: task.timestamp,
+                        weekday: task.weekday,
                         isCompleted: task.isCompleted,
                         description: descriptionText.isEmpty ? nil : descriptionText,
                         time: useTime ? selectedTime : nil,

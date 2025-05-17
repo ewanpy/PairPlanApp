@@ -13,6 +13,13 @@ struct AddTaskView: View {
     @State private var useTime: Bool = false
     @State private var checklist: [ChecklistItem] = []
     @State private var showChecklistEditor = false
+    @State private var selectedWeekday: Int
+
+    init(sessionCode: String, mode: SessionMode, defaultWeekday: Int) {
+        self.sessionCode = sessionCode
+        self.mode = mode
+        _selectedWeekday = State(initialValue: defaultWeekday)
+    }
     
     var body: some View {
         NavigationView {
@@ -53,6 +60,17 @@ struct AddTaskView: View {
                         Button("Редактировать чеклист") { showChecklistEditor = true }
                     }
                 }
+                Section(header: Text("День недели")) {
+                    Picker("День недели", selection: $selectedWeekday) {
+                        Text("Понедельник").tag(1)
+                        Text("Вторник").tag(2)
+                        Text("Среда").tag(3)
+                        Text("Четверг").tag(4)
+                        Text("Пятница").tag(5)
+                        Text("Суббота").tag(6)
+                        Text("Воскресенье").tag(7)
+                    }
+                }
             }
             .navigationTitle("Новая задача")
             .navigationBarTitleDisplayMode(.inline)
@@ -69,7 +87,8 @@ struct AddTaskView: View {
                             mode: mode,
                             description: descriptionText.isEmpty ? nil : descriptionText,
                             time: useTime ? selectedTime : nil,
-                            checklist: checklist.isEmpty ? nil : checklist
+                            checklist: checklist.isEmpty ? nil : checklist,
+                            weekday: selectedWeekday
                         )
                         dismiss()
                     }
@@ -80,5 +99,13 @@ struct AddTaskView: View {
         .sheet(isPresented: $showChecklistEditor) {
             ChecklistEditorView(checklist: $checklist)
         }
+    }
+
+    func getCurrentWeekNumber() -> Int {
+        Calendar.current.component(.weekOfYear, from: Date())
+    }
+
+    func getCurrentYear() -> Int {
+        Calendar.current.component(.year, from: Date())
     }
 }
