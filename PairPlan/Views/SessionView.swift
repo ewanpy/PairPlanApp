@@ -77,21 +77,6 @@ struct SessionView: View {
                                                     .lineLimit(1)
                                             }
                                             Spacer()
-                                            Button(action: {
-                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
-                                                    recentJoinButtonPressed = code
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                                        recentJoinButtonPressed = nil
-                                                        viewModel.joinSession(code: code)
-                                                    }
-                                                }
-                                            }) {
-                                                Image(systemName: "arrow.right.circle.fill")
-                                                    .foregroundColor(.accentColor)
-                                                    .font(.title2)
-                                            }
-                                            .scaleEffect(recentJoinButtonPressed == code ? 0.95 : 1.0)
-                                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: recentJoinButtonPressed)
                                             Button(action: { viewModel.removeRecentSession(code) }) {
                                                 Image(systemName: "xmark.circle.fill")
                                                     .foregroundColor(.secondary)
@@ -103,6 +88,16 @@ struct SessionView: View {
                                                 .fill(Color(.systemBackground))
                                                 .shadow(color: Color(.black).opacity(0.08), radius: 4, x: 0, y: 2)
                                         )
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
+                                                recentJoinButtonPressed = code
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                                    recentJoinButtonPressed = nil
+                                                    viewModel.joinSession(code: code)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 .padding(.horizontal)

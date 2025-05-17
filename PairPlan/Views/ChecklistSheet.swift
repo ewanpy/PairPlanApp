@@ -51,11 +51,16 @@ struct ChecklistEditorView: View {
 struct ChecklistMarkView: View {
     @Binding var checklist: [ChecklistItem]
     @Environment(\.presentationMode) var presentationMode
+    var isReadOnly: Bool = false
     var body: some View {
         NavigationView {
             List {
                 ForEach($checklist) { $item in
-                    Button(action: { item.isCompleted.toggle() }) {
+                    Button(action: {
+                        if !isReadOnly {
+                            item.isCompleted.toggle()
+                        }
+                    }) {
                         HStack {
                             Image(systemName: item.isCompleted ? "checkmark.square.fill" : "square")
                                 .foregroundColor(item.isCompleted ? .green : .gray)
@@ -64,6 +69,8 @@ struct ChecklistMarkView: View {
                                 .foregroundColor(item.isCompleted ? .gray : .primary)
                         }
                     }
+                    .disabled(isReadOnly)
+                    .opacity(isReadOnly ? 0.6 : 1.0)
                 }
             }
             .navigationTitle("Чеклист задачи")

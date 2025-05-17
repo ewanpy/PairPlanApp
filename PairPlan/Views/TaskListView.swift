@@ -73,34 +73,22 @@ struct TaskListView: View {
                             }
                         },
                         isIndividual: mode == .individual,
-                        previousUserId: prevUserId
+                        previousUserId: prevUserId,
+                        onEdit: {
+                            editingTask = task
+                            showEditSheet = true
+                        },
+                        onDelete: {
+                            deleteTaskById(task.id)
+                        },
+                        onChecklist: {
+                            checklistTask = task
+                            showChecklistSheet = true
+                        }
                     )
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets())
-                    .contextMenu {
-                        if task.userId == currentUserId {
-                            Button(action: {
-                                editingTask = task
-                                showEditSheet = true
-                            }) {
-                                Label("Редактировать", systemImage: "pencil")
-                            }
-                            Button(role: .destructive, action: {
-                                deleteTaskById(task.id)
-                            }) {
-                                Label("Удалить", systemImage: "trash")
-                            }
-                        }
-                        if let checklist = task.checklist, !checklist.isEmpty {
-                            Button(action: {
-                                checklistTask = task
-                                showChecklistSheet = true
-                            }) {
-                                Label("Чеклист", systemImage: "checklist")
-                            }
-                        }
-                    }
                 }
             }
             .listStyle(PlainListStyle())
@@ -127,7 +115,10 @@ struct TaskListView: View {
         }
         .sheet(isPresented: $showChecklistSheet) {
             if let checklistTask = checklistTask, let binding = bindingForTask(withId: checklistTask.id) {
-                ChecklistMarkView(checklist: binding)
+                ChecklistMarkView(
+                    checklist: binding,
+                    isReadOnly: checklistTask.userId != currentUserId
+                )
             }
         }
         .onAppear {
@@ -171,7 +162,11 @@ struct TaskRow: View {
     let onToggleComplete: () -> Void
     let isIndividual: Bool
     let previousUserId: String?
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    let onChecklist: () -> Void
     @State private var isPressed = false
+    @State private var isLongPressed = false
 
     var isCurrentUser: Bool { task.userId == currentUserId }
     var bubbleColor: Color {
@@ -248,76 +243,72 @@ struct TaskRow: View {
                     }
                     Text(task.title)
                         .font(.system(size: fontSize + 2, weight: .bold))
-                        .foregroundColor(textColor)
-                        .strikethrough(task.isCompleted)
-                        .opacity(task.isCompleted ? 0.45 : 1.0)
-                        .padding(.trailing, 54)
                 }
                 if let description = task.description, !description.isEmpty {
                     Text(description)
                         .font(.system(size: fontSize - 2))
-                        .foregroundColor(textColor.opacity(0.7))
-                        .lineLimit(2)
-                        .padding(.top, 2)
-                        .opacity(task.isCompleted ? 0.35 : 1.0)
-                        .padding(.trailing, 54)
                 }
                 if let checklist = task.checklist, !checklist.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(Array(checklist.prefix(5))) { item in
-                            HStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(checklist.prefix(3)), id: \.id) { item in
+                            HStack(spacing: 4) {
                                 Image(systemName: item.isCompleted ? "checkmark.square.fill" : "square")
                                     .foregroundColor(item.isCompleted ? .green : .gray)
                                     .font(.system(size: fontSize - 4))
                                 Text(item.text)
                                     .font(.system(size: fontSize - 4))
-                                    .strikethrough(item.isCompleted)
                                     .foregroundColor(item.isCompleted ? .gray : textColor)
-                                    .opacity(item.isCompleted ? 0.5 : 1.0)
+                                    .strikethrough(item.isCompleted)
+                                    .lineLimit(1)
                             }
                         }
-                        if checklist.count > 5 {
-                            Text("ещё \(checklist.count - 5)...")
-                                .font(.caption2)
+                        if checklist.count > 3 {
+                            Text("+\(checklist.count - 3)")
+                                .font(.system(size: fontSize - 6))
                                 .foregroundColor(.gray)
                         }
                     }
-                    .padding(.top, 2)
-                    .padding(.trailing, 54)
                 }
-                Spacer(minLength: 0)
+                if let time = task.time {
+                    HStack {
+                        Image(systemName: "clock")
+                        Text(time, style: .time)
+                    }
+                    .font(.system(size: fontSize - 2))
+                }
             }
-            .padding(.trailing, 54)
-            if let time = task.time {
-                HStack(spacing: 3) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                    Text(time, style: .time)
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, 12)
+            .frame(maxWidth: 280, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(bubbleColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isLongPressed ? Color.accentColor : Color.clear, lineWidth: 2)
+                    )
+            )
+            .foregroundColor(textColor)
+        }
+        .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isLongPressed = pressing
+            }
+        }, perform: {})
+        .contextMenu {
+            if task.userId == currentUserId {
+                Button(action: onEdit) {
+                    Label("Редактировать", systemImage: "pencil")
                 }
-                .padding([.bottom, .trailing], 8)
+                Button(role: .destructive, action: onDelete) {
+                    Label("Удалить", systemImage: "trash")
+                }
+            }
+            if let checklist = task.checklist, !checklist.isEmpty {
+                Button(action: onChecklist) {
+                    Label("Чеклист", systemImage: "checklist")
+                }
             }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(bubbleColor)
-                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
-        )
-        .overlay(
-            Group {
-                if task.isCompleted && !isCurrentUser {
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(Color.green, lineWidth: 2)
-                } else {
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(Color.gray.opacity(0.13), lineWidth: 1)
-                }
-            }
-        )
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isPressed)
     }
 }
