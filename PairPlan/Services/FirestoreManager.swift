@@ -2,6 +2,7 @@
 import Foundation
 import FirebaseFirestore
 
+// Синглтон для работы с Firestore (создание, загрузка, удаление задач и сессий)
 class FirestoreManager {
     static let shared = FirestoreManager()
     private let db = Firestore.firestore()
@@ -10,6 +11,7 @@ class FirestoreManager {
     
     // MARK: - Session Management
     
+    /// Создаёт новую сессию
     func createSession(code: String, mode: SessionMode, completion: @escaping (Error?) -> Void) {
         let sessionData: [String: Any] = [
             "code": code,
@@ -23,6 +25,7 @@ class FirestoreManager {
         }
     }
     
+    /// Проверяет, существует ли сессия
     func sessionExists(code: String, completion: @escaping (Bool) -> Void) {
         db.collection("sessions").document(code).getDocument { snapshot, error in
             completion(snapshot?.exists ?? false)
@@ -107,6 +110,7 @@ class FirestoreManager {
     
     // MARK: - Task Management
     
+    /// Добавляет задачу в Firestore
     func addTask(sessionCode: String, task: Task, completion: @escaping (Error?) -> Void) {
         var taskData: [String: Any] = [
             "id": task.id,
@@ -138,6 +142,7 @@ class FirestoreManager {
             }
     }
     
+    /// Загружает задачи из Firestore для сессии
     func loadTasks(sessionCode: String, completion: @escaping ([Task]) -> Void) {
         db.collection("sessions").document(sessionCode)
             .collection("tasks")
@@ -189,6 +194,7 @@ class FirestoreManager {
             }
     }
     
+    /// Удаляет задачу из Firestore
     func deleteTask(sessionCode: String, task: Task, completion: @escaping (Error?) -> Void) {
         db.collection("sessions").document(sessionCode)
             .collection("tasks").document(task.id)

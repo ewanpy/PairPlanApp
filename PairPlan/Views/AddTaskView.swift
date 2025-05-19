@@ -2,6 +2,7 @@
 import SwiftUI
 import PhotosUI
 
+// Экран добавления новой задачи. Позволяет ввести название, описание, выбрать тип, время, чеклист и день недели.
 struct AddTaskView: View {
     let sessionCode: String
     let mode: SessionMode
@@ -101,10 +102,12 @@ struct AddTaskView: View {
         }
     }
 
+    // Возвращает номер текущей недели в году
     func getCurrentWeekNumber() -> Int {
         Calendar.current.component(.weekOfYear, from: Date())
     }
 
+    // Возвращает текущий год
     func getCurrentYear() -> Int {
         Calendar.current.component(.year, from: Date())
     }

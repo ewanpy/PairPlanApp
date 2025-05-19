@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 
+// Экран редактирования существующей задачи. Позволяет изменить основные параметры задачи и сохранить изменения.
 struct EditTaskView: View {
     let task: Task
     let onSave: (Task) -> Void

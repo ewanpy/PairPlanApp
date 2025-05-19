@@ -48,6 +48,7 @@ struct ChecklistEditorView: View {
     }
 }
 
+// Экран просмотра и отметки чеклиста задачи. Если isReadOnly == true, чеклист только для просмотра.
 struct ChecklistMarkView: View {
     @Binding var checklist: [ChecklistItem]
     @Environment(\.presentationMode) var presentationMode
