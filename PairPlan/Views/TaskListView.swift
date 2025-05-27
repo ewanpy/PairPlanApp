@@ -15,8 +15,6 @@ struct TaskListView: View {
     @State private var showingAddTask = false
     /// Выбранные типы задач для фильтрации
     @State private var selectedTaskTypes: Set<TaskType> = Set(TaskType.allCases)
-    /// Флаг отображения экрана редактирования задачи
-    @State private var showEditSheet = false
     /// Задача, выбранная для редактирования
     @State private var editingTask: Task? = nil
     /// Флаг отображения экрана чеклиста
@@ -34,42 +32,11 @@ struct TaskListView: View {
         VStack {
             // Меню выбора дня недели с визуализацией статуса дней
             WeekdayPicker(selectedWeekday: $selectedWeekday)
-            // Фильтр по типу задач (только для общего режима)
-            if mode == .shared {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(TaskType.allCases, id: \.self) { type in
-                            Button(action: {
-                                if selectedTaskTypes.contains(type) {
-                                    selectedTaskTypes.remove(type)
-                                } else {
-                                    selectedTaskTypes.insert(type)
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: type.icon)
-                                    Text(type.description)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .fill(selectedTaskTypes.contains(type) ? Color.accentColor : Color(.systemGray5))
-                                )
-                                .foregroundColor(selectedTaskTypes.contains(type) ? .white : .primary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                .padding(.vertical, 8)
-            }
-            // Список задач, отфильтрованный по дню недели и типу, отсортированный по времени
+            // Список задач, отфильтрованный по дню недели, отсортированный по времени
             List {
                 // Фильтрация и сортировка задач
                 let filteredTasks = viewModel.tasks
                     .filter { $0.weekday == selectedWeekday }
-                    .filter { selectedTaskTypes.contains($0.type) }
                     .sorted {
                         // Сортировка: сначала задачи без времени, затем по времени (24ч)
                         switch ($0.time, $1.time) {
@@ -90,7 +57,6 @@ struct TaskListView: View {
                         task: task,
                         currentUserId: currentUserId,
                         onToggleComplete: {
-                            // Переключение выполнения задачи с анимацией
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task)
                             }
@@ -99,7 +65,6 @@ struct TaskListView: View {
                         previousUserId: prevUserId,
                         onEdit: {
                             editingTask = task
-                            showEditSheet = true
                         },
                         onDelete: {
                             deleteTaskById(task.id)
@@ -130,13 +95,10 @@ struct TaskListView: View {
             AddTaskView(sessionCode: sessionCode, mode: mode, defaultWeekday: selectedWeekday)
         }
         // Экран редактирования задачи
-        .sheet(isPresented: $showEditSheet) {
-            if let editingTask = editingTask {
-                EditTaskView(task: editingTask) { updatedTask in
-                    // Сохраняем изменения через FirestoreManager
-                    FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
-                    showEditSheet = false
-                }
+        .sheet(item: $editingTask) { task in
+            EditTaskView(task: task) { updatedTask in
+                FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+                editingTask = nil // Закрыть sheet после сохранения
             }
         }
         // Экран просмотра чеклиста
@@ -201,46 +163,74 @@ struct TaskListView: View {
     }
 }
 
-// Строка задачи в списке. Отвечает за отображение, анимацию, контекстное меню и визуализацию статуса задачи.
+// Строка задачи в списке. Отвечает за отображение задачи, анимацию, контекстное меню и визуализацию статуса задачи.
 struct TaskRow: View {
+    /// Задача, которую отображает строка
     let task: Task
+    /// ID текущего пользователя (для определения владельца задачи)
     let currentUserId: String
+    /// Callback для переключения выполнения задачи
     let onToggleComplete: () -> Void
+    /// Флаг индивидуального режима (меняет стиль отображения)
     let isIndividual: Bool
+    /// ID пользователя предыдущей задачи (для визуального разделения)
     let previousUserId: String?
+    /// Callback для редактирования задачи
     let onEdit: () -> Void
+    /// Callback для удаления задачи
     let onDelete: () -> Void
+    /// Callback для открытия чеклиста задачи
     let onChecklist: () -> Void
+    /// Состояние анимации нажатия
     @State private var isPressed = false
+    /// Состояние долгого нажатия (для подсветки)
     @State private var isLongPressed = false
 
+    /// Является ли задача задачей текущего пользователя
     var isCurrentUser: Bool { task.userId == currentUserId }
+    /// Цвет фона "пузыря" задачи в зависимости от статуса и владельца
     var bubbleColor: Color {
-        if task.isCompleted {
-            if isCurrentUser {
-                return Color.green.opacity(0.13)
+        if isIndividual {
+            if task.isCompleted {
+                if isCurrentUser {
+                    return Color.green.opacity(0.13)
+                } else {
+                    return Color.teal.opacity(0.18)
+                }
+            } else if isCurrentUser {
+                return Color(.systemGray6)
             } else {
-                return Color.teal.opacity(0.18)
+                return Color.accentColor.opacity(0.85)
             }
-        } else if isCurrentUser {
-            return Color(.systemGray6)
         } else {
-            return Color.accentColor.opacity(0.85)
+            // В режиме shared цвет всегда одинаковый для всех
+            return task.isCompleted ? Color.green.opacity(0.13) : Color(.systemGray6)
         }
     }
+    /// Цвет текста задачи
     var textColor: Color {
-        if task.isCompleted && !isCurrentUser {
-            return .primary
+        if isIndividual {
+            if task.isCompleted && !isCurrentUser {
+                return .primary
+            } else {
+                return isCurrentUser ? .primary : .white
+            }
         } else {
-            return isCurrentUser ? .primary : .white
+            // В режиме shared цвет текста всегда одинаковый для всех
+            return task.isCompleted ? .gray : .primary
         }
     }
+    /// Выравнивание пузыря (слева для своих, справа для чужих)
     var alignment: Alignment { isCurrentUser ? .leading : .trailing }
-
+    /// Высота пузыря
     var bubbleHeight: CGFloat { isIndividual ? 42 : 50 }
+    /// Размер шрифта
     var fontSize: CGFloat { isIndividual ? 17 : 20 }
+    /// Размер иконки чекбокса
     var circleSize: CGFloat { isIndividual ? 20 : 24 }
+    /// Горизонтальный паддинг
     var horizontalPadding: CGFloat { isIndividual ? 14 : 20 }
+    /// Вертикальный отступ между задачами
     var verticalSpacing: CGFloat {
         if isIndividual, let prev = previousUserId, prev == task.userId {
             return 6
@@ -252,35 +242,54 @@ struct TaskRow: View {
     }
 
     var body: some View {
-        HStack {
-            if isCurrentUser { Spacer() }
-            Group {
-                if isCurrentUser {
-                    Button(action: {
-                        isPressed = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                            isPressed = false
-                            onToggleComplete()
+        if isIndividual {
+            HStack {
+                if isCurrentUser { Spacer() }
+                Group {
+                    if isCurrentUser {
+                        Button(action: {
+                            isPressed = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                isPressed = false
+                                onToggleComplete()
+                            }
+                        }) {
+                            bubbleContent
                         }
-                    }) {
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(isPressed ? 0.97 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+                    } else {
                         bubbleContent
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(isPressed ? 0.97 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-                } else {
-                    bubbleContent
                 }
+                if !isCurrentUser { Spacer() }
             }
-            if !isCurrentUser { Spacer() }
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .padding(.vertical, verticalSpacing)
+        } else {
+            Button(action: {
+                isPressed = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    isPressed = false
+                    onToggleComplete()
+                }
+            }) {
+                bubbleContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         }
-        .frame(maxWidth: .infinity, alignment: alignment)
-        .padding(.vertical, verticalSpacing)
     }
 
+    /// Основное содержимое пузыря задачи: заголовок, описание, чеклист, время
     private var bubbleContent: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(alignment: .leading, spacing: 6) {
+                // Заголовок и статус выполнения
                 HStack(alignment: .top, spacing: 6) {
                     if task.isCompleted {
                         Image(systemName: "checkmark.circle.fill")
@@ -290,10 +299,12 @@ struct TaskRow: View {
                     Text(task.title)
                         .font(.system(size: fontSize + 2, weight: .bold))
                 }
+                // Описание задачи (если есть)
                 if let description = task.description, !description.isEmpty {
                     Text(description)
                         .font(.system(size: fontSize - 2))
                 }
+                // Превью чеклиста (до 3 пунктов)
                 if let checklist = task.checklist, !checklist.isEmpty {
                     HStack(spacing: 8) {
                         ForEach(Array(checklist.prefix(3)), id: \.id) { item in
@@ -315,6 +326,7 @@ struct TaskRow: View {
                         }
                     }
                 }
+                // Время задачи (если есть)
                 if let time = task.time {
                     HStack {
                         Image(systemName: "clock")
@@ -325,7 +337,7 @@ struct TaskRow: View {
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 12)
-            .frame(maxWidth: 280, alignment: .leading)
+            .frame(maxWidth: isIndividual ? 280 : .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(bubbleColor)
@@ -336,11 +348,13 @@ struct TaskRow: View {
             )
             .foregroundColor(textColor)
         }
+        // Подсветка при долгом нажатии
         .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isLongPressed = pressing
             }
         }, perform: {})
+        // Контекстное меню для действий над задачей
         .contextMenu {
             if task.userId == currentUserId {
                 Button(action: onEdit) {
@@ -362,7 +376,9 @@ struct TaskRow: View {
 // Компонент для выбора дня недели. Визуально выделяет прошедшие, текущий и будущие дни.
 // Используется для фильтрации задач по дню недели.
 struct WeekdayPicker: View {
+    /// Привязка к выбранному дню недели (1 = Пн, 7 = Вс)
     @Binding var selectedWeekday: Int
+    /// Массив коротких названий дней недели
     let weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
     var body: some View {
         let today = getCurrentWeekday()
@@ -370,7 +386,7 @@ struct WeekdayPicker: View {
             ForEach(1...7, id: \.self) { day in
                 let isPast = day < today
                 let isToday = day == today
-                let isFuture = day > today
+                // Кнопка выбора дня недели
                 Button(action: { selectedWeekday = day }) {
                     Text(weekdays[day-1])
                         .font(.headline)
@@ -396,7 +412,7 @@ struct WeekdayPicker: View {
         }
         .padding(.horizontal)
     }
-    // Возвращает текущий день недели (1 = Пн, 7 = Вс)
+    /// Возвращает текущий день недели (1 = Пн, 7 = Вс) по локали пользователя
     func getCurrentWeekday() -> Int {
         let weekday = Calendar.current.component(.weekday, from: Date())
         return weekday == 1 ? 7 : weekday - 1

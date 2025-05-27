@@ -6,6 +6,7 @@ import PhotosUI
 struct AddTaskView: View {
     let sessionCode: String
     let mode: SessionMode
+    let selectedWeekday: Int
     
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = AddTaskViewModel()
@@ -14,16 +15,15 @@ struct AddTaskView: View {
     @State private var useTime: Bool = false
     @State private var checklist: [ChecklistItem] = []
     @State private var showChecklistEditor = false
-    @State private var selectedWeekday: Int
 
     init(sessionCode: String, mode: SessionMode, defaultWeekday: Int) {
         self.sessionCode = sessionCode
         self.mode = mode
-        _selectedWeekday = State(initialValue: defaultWeekday)
+        self.selectedWeekday = defaultWeekday
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Детали задачи")) {
                     TextField("Название", text: $viewModel.title)
@@ -59,17 +59,6 @@ struct AddTaskView: View {
                             }
                         }
                         Button("Редактировать чеклист") { showChecklistEditor = true }
-                    }
-                }
-                Section(header: Text("День недели")) {
-                    Picker("День недели", selection: $selectedWeekday) {
-                        Text("Понедельник").tag(1)
-                        Text("Вторник").tag(2)
-                        Text("Среда").tag(3)
-                        Text("Четверг").tag(4)
-                        Text("Пятница").tag(5)
-                        Text("Суббота").tag(6)
-                        Text("Воскресенье").tag(7)
                     }
                 }
             }

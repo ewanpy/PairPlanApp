@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-// Экран редактирования существующей задачи. Позволяет изменить основные параметры задачи и сохранить изменения.
+// Экран редактирования задачи. Позволяет изменить основные параметры задачи и сохранить изменения.
 struct EditTaskView: View {
     let task: Task
     let onSave: (Task) -> Void
@@ -20,6 +20,8 @@ struct EditTaskView: View {
     init(task: Task, onSave: @escaping (Task) -> Void) {
         self.task = task
         self.onSave = onSave
+        
+        // Инициализируем все состояния сразу при создании вью
         _title = State(initialValue: task.title)
         _date = State(initialValue: task.timestamp)
         _selectedType = State(initialValue: task.type)
@@ -41,16 +43,19 @@ struct EditTaskView: View {
                         }
                     }
                 }
+                
                 Section(header: Text("Описание")) {
                     TextEditor(text: $descriptionText)
                         .frame(minHeight: 60)
                 }
+                
                 Section(header: Text("Время")) {
                     Toggle("Установить время", isOn: $useTime)
                     if useTime {
                         DatePicker("Время", selection: $selectedTime, displayedComponents: [.hourAndMinute])
                     }
                 }
+                
                 Section(header: Text("Чеклист")) {
                     if checklist.isEmpty {
                         Button("Добавить чеклист") { showChecklistEditor = true }
@@ -64,7 +69,7 @@ struct EditTaskView: View {
                                     .foregroundColor(item.isCompleted ? .gray : .primary)
                             }
                         }
-                        Button("Чеклист") { showChecklistEditor = true }
+                        Button("Редактировать чеклист") { showChecklistEditor = true }
                     }
                 }
             }
@@ -79,7 +84,7 @@ struct EditTaskView: View {
                         title: title,
                         type: selectedType,
                         userId: task.userId,
-                        timestamp: task.timestamp,
+                        timestamp: date,
                         weekday: task.weekday,
                         isCompleted: task.isCompleted,
                         description: descriptionText.isEmpty ? nil : descriptionText,
@@ -87,6 +92,7 @@ struct EditTaskView: View {
                         checklist: checklist.isEmpty ? nil : checklist
                     )
                     onSave(updatedTask)
+                    presentationMode.wrappedValue.dismiss()
                 }
                 .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             )
