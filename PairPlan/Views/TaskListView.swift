@@ -27,59 +27,75 @@ struct TaskListView: View {
     private var currentUserId: String {
         UserDefaults.standard.string(forKey: "PairPlan.currentUserId") ?? ""
     }
+    /// View mode picker
+    @State private var viewMode: TaskViewMode = .list
     
     var body: some View {
         VStack {
-            // Меню выбора дня недели с визуализацией статуса дней
-            WeekdayPicker(selectedWeekday: $selectedWeekday)
-            // Список задач, отфильтрованный по дню недели, отсортированный по времени
-            List {
-                // Фильтрация и сортировка задач
-                let filteredTasks = viewModel.tasks
-                    .filter { $0.weekday == selectedWeekday }
-                    .sorted {
-                        // Сортировка: сначала задачи без времени, затем по времени (24ч)
-                        switch ($0.time, $1.time) {
-                        case let (t0?, t1?):
-                            return t0 < t1
-                        case (nil, nil):
-                            return false
-                        case (nil, _?):
-                            return true
-                        case (_?, nil):
-                            return false
-                        }
-                    }
-                // Отображение каждой задачи через TaskRow
-                ForEach(Array(filteredTasks.enumerated()), id: \ .element.id) { index, task in
-                    let prevUserId = index > 0 ? filteredTasks[index-1].userId : nil
-                    TaskRow(
-                        task: task,
-                        currentUserId: currentUserId,
-                        onToggleComplete: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task)
-                            }
-                        },
-                        isIndividual: mode == .individual,
-                        previousUserId: prevUserId,
-                        onEdit: {
-                            editingTask = task
-                        },
-                        onDelete: {
-                            deleteTaskById(task.id)
-                        },
-                        onChecklist: {
-                            checklistTask = task
-                            showChecklistSheet = true
-                        }
-                    )
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets())
-                }
+            // View mode picker
+            Picker("Режим отображения", selection: $viewMode) {
+                Image(systemName: "list.bullet")
+                    .tag(TaskViewMode.list)
+                Image(systemName: "clock")
+                    .tag(TaskViewMode.timeline)
             }
-            .listStyle(PlainListStyle())
+            .pickerStyle(SegmentedPickerStyle())
+            .padding()
+            
+            if viewMode == .list {
+                // Меню выбора дня недели с визуализацией статуса дней
+                WeekdayPicker(selectedWeekday: $selectedWeekday)
+                // Список задач, отфильтрованный по дню недели, отсортированный по времени
+                List {
+                    // Фильтрация и сортировка задач
+                    let filteredTasks = viewModel.tasks
+                        .filter { $0.weekday == selectedWeekday }
+                        .sorted {
+                            // Сортировка: сначала задачи без времени, затем по времени (24ч)
+                            switch ($0.time, $1.time) {
+                            case let (t0?, t1?):
+                                return t0 < t1
+                            case (nil, nil):
+                                return false
+                            case (nil, _?):
+                                return true
+                            case (_?, nil):
+                                return false
+                            }
+                        }
+                    // Отображение каждой задачи через TaskRow
+                    ForEach(Array(filteredTasks.enumerated()), id: \ .element.id) { index, task in
+                        let prevUserId = index > 0 ? filteredTasks[index-1].userId : nil
+                        TaskRow(
+                            task: task,
+                            currentUserId: currentUserId,
+                            onToggleComplete: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task)
+                                }
+                            },
+                            isIndividual: mode == .individual,
+                            previousUserId: prevUserId,
+                            onEdit: {
+                                editingTask = task
+                            },
+                            onDelete: {
+                                deleteTaskById(task.id)
+                            },
+                            onChecklist: {
+                                checklistTask = task
+                                showChecklistSheet = true
+                            }
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                    }
+                }
+                .listStyle(PlainListStyle())
+            } else {
+                TimelineView(tasks: viewModel.tasks)
+            }
         }
         .navigationTitle("Сессия \(sessionCode)")
         .toolbar {
@@ -417,4 +433,9 @@ struct WeekdayPicker: View {
         let weekday = Calendar.current.component(.weekday, from: Date())
         return weekday == 1 ? 7 : weekday - 1
     }
+}
+
+enum TaskViewMode {
+    case list
+    case timeline
 }
