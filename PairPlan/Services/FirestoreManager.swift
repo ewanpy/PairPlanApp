@@ -127,6 +127,9 @@ class FirestoreManager {
         if let time = task.time {
             taskData["time"] = time
         }
+        if let endTime = task.endTime {
+            taskData["endTime"] = endTime
+        }
         if let checklist = task.checklist {
             taskData["checklist"] = checklist.map { [
                 "id": $0.id,
@@ -166,6 +169,7 @@ class FirestoreManager {
                     }
                     let description = data["description"] as? String
                     let time = (data["time"] as? Timestamp)?.dateValue()
+                    let endTime = (data["endTime"] as? Timestamp)?.dateValue()
                     var checklist: [ChecklistItem]? = nil
                     if let checklistArray = data["checklist"] as? [[String: Any]] {
                         checklist = checklistArray.compactMap { dict in
@@ -186,6 +190,7 @@ class FirestoreManager {
                         isCompleted: isCompleted,
                         description: description,
                         time: time,
+                        endTime: endTime,
                         checklist: checklist
                     )
                 }

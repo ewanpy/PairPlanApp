@@ -12,6 +12,8 @@ struct EditTaskView: View {
     @State private var descriptionText: String
     @State private var useTime: Bool
     @State private var selectedTime: Date
+    @State private var useEndTime: Bool
+    @State private var selectedEndTime: Date
     @State private var checklist: [ChecklistItem]
     @State private var showChecklistEditor = false
 
@@ -28,6 +30,8 @@ struct EditTaskView: View {
         _descriptionText = State(initialValue: task.description ?? "")
         _useTime = State(initialValue: task.time != nil)
         _selectedTime = State(initialValue: task.time ?? task.timestamp)
+        _useEndTime = State(initialValue: task.endTime != nil)
+        _selectedEndTime = State(initialValue: task.endTime ?? (task.time ?? task.timestamp).addingTimeInterval(3600))
         _checklist = State(initialValue: task.checklist ?? [])
     }
 
@@ -52,7 +56,17 @@ struct EditTaskView: View {
                 Section(header: Text("Время")) {
                     Toggle("Установить время", isOn: $useTime)
                     if useTime {
-                        DatePicker("Время", selection: $selectedTime, displayedComponents: [.hourAndMinute])
+                        DatePicker("Начало", selection: $selectedTime, displayedComponents: [.hourAndMinute])
+                        Toggle("Установить время окончания", isOn: $useEndTime)
+                        if useEndTime {
+                            DatePicker("Окончание", selection: $selectedEndTime, displayedComponents: [.hourAndMinute])
+                                .onChange(of: selectedTime) { newTime in
+                                    // Если время начала больше времени окончания, обновляем время окончания
+                                    if newTime > selectedEndTime {
+                                        selectedEndTime = Calendar.current.date(byAdding: .hour, value: 1, to: newTime) ?? newTime
+                                    }
+                                }
+                        }
                     }
                 }
                 
@@ -89,6 +103,7 @@ struct EditTaskView: View {
                         isCompleted: task.isCompleted,
                         description: descriptionText.isEmpty ? nil : descriptionText,
                         time: useTime ? selectedTime : nil,
+                        endTime: useTime && useEndTime ? selectedEndTime : nil,
                         checklist: checklist.isEmpty ? nil : checklist
                     )
                     onSave(updatedTask)

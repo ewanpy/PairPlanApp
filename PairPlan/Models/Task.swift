@@ -18,6 +18,7 @@ struct Task: Identifiable, Codable {
     var isCompleted: Bool
     var description: String?
     var time: Date?
+    var endTime: Date?   // Время окончания задачи
     var checklist: [ChecklistItem]?
     
     init(id: String = UUID().uuidString,
@@ -29,6 +30,7 @@ struct Task: Identifiable, Codable {
          isCompleted: Bool = false,
          description: String? = nil,
          time: Date? = nil,
+         endTime: Date? = nil,
          checklist: [ChecklistItem]? = nil) {
         self.id = id
         self.title = title
@@ -39,6 +41,7 @@ struct Task: Identifiable, Codable {
         self.isCompleted = isCompleted
         self.description = description
         self.time = time
+        self.endTime = endTime
         self.checklist = checklist
     }
 }

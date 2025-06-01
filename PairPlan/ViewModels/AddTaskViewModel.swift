@@ -6,7 +6,7 @@ class AddTaskViewModel: ObservableObject {
     @Published var selectedType: TaskType = .other
     
     /// Добавляет новую задачу в Firestore
-    func addTask(sessionCode: String, mode: SessionMode, description: String? = nil, time: Date? = nil, checklist: [ChecklistItem]? = nil, weekday: Int) {
+    func addTask(sessionCode: String, mode: SessionMode, description: String? = nil, time: Date? = nil, endTime: Date? = nil, checklist: [ChecklistItem]? = nil, weekday: Int) {
         let task = Task(
             title: title,
             type: selectedType,
@@ -15,6 +15,7 @@ class AddTaskViewModel: ObservableObject {
             weekday: weekday,
             description: description,
             time: time,
+            endTime: endTime,
             checklist: checklist
         )
         
