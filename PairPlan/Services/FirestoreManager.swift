@@ -119,7 +119,8 @@ class FirestoreManager {
             "userId": task.userId,
             "timestamp": task.timestamp,
             "isCompleted": task.isCompleted,
-            "weekday": task.weekday
+            "weekday": task.weekday,
+            "status": task.status.rawValue
         ]
         if let description = task.description {
             taskData["description"] = description
@@ -180,6 +181,8 @@ class FirestoreManager {
                         }
                     }
                     let weekday = data["weekday"] as? Int ?? 1
+                    let statusString = data["status"] as? String
+                    let status = TaskStatus(rawValue: statusString ?? "normal") ?? .normal
                     return Task(
                         id: id,
                         title: title,
@@ -191,7 +194,8 @@ class FirestoreManager {
                         description: description,
                         time: time,
                         endTime: endTime,
-                        checklist: checklist
+                        checklist: checklist,
+                        status: status
                     )
                 }
                 
@@ -206,5 +210,17 @@ class FirestoreManager {
             .delete { error in
                 completion(error)
             }
+    }
+    
+    /// Обновляет статус задачи по sessionCode и taskId
+    func updateTaskStatus(sessionCode: String, taskId: String, status: TaskStatus) {
+        let taskRef = db.collection("sessions").document(sessionCode).collection("tasks").document(taskId)
+        taskRef.updateData(["status": status.rawValue]) { error in
+            if let error = error {
+                print("Ошибка при обновлении статуса задачи: \(error)")
+            } else {
+                print("Статус задачи успешно обновлён: \(taskId) -> \(status.rawValue)")
+            }
+        }
     }
 }

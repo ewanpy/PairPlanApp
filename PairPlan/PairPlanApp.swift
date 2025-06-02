@@ -32,7 +32,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         // Устанавливаем делегат для обработки уведомлений
         UNUserNotificationCenter.current().delegate = self
+        registerNotificationCategories()
         return true
+    }
+    
+    // Регистрируем категории и действия для уведомлений
+    private func registerNotificationCategories() {
+        let snoozeAction = UNNotificationAction(identifier: "SNOOZE_ACTION", title: "Отложить", options: [])
+        let cancelAction = UNNotificationAction(identifier: "CANCEL_ACTION", title: "Отменить", options: [.destructive])
+        let doneAction = UNNotificationAction(identifier: "DONE_ACTION", title: "Выполнено", options: [.authenticationRequired])
+        let category = UNNotificationCategory(identifier: "TASK_CATEGORY", actions: [snoozeAction, cancelAction, doneAction], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category])
     }
     
     // Обработка уведомлений, когда приложение открыто
@@ -42,6 +52,25 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     // Обработка нажатия на уведомление
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let identifier = response.notification.request.identifier
+        let components = identifier.split(separator: "_")
+        guard components.count >= 2 else {
+            completionHandler()
+            return
+        }
+        let sessionCode = String(components[0])
+        let taskId = components.dropFirst().joined(separator: "_")
+        
+        switch response.actionIdentifier {
+        case "SNOOZE_ACTION":
+            FirestoreManager.shared.updateTaskStatus(sessionCode: sessionCode, taskId: taskId, status: .snoozed)
+        case "CANCEL_ACTION":
+            FirestoreManager.shared.updateTaskStatus(sessionCode: sessionCode, taskId: taskId, status: .cancelled)
+        case "DONE_ACTION":
+            FirestoreManager.shared.updateTaskStatus(sessionCode: sessionCode, taskId: taskId, status: .done)
+        default:
+            break
+        }
         completionHandler()
     }
 }

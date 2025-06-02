@@ -8,6 +8,13 @@ struct ChecklistItem: Codable, Hashable, Identifiable {
     var isCompleted: Bool
 }
 
+enum TaskStatus: String, Codable {
+    case normal
+    case snoozed
+    case cancelled
+    case done
+}
+
 struct Task: Identifiable, Codable {
     var id: String
     var title: String
@@ -20,6 +27,7 @@ struct Task: Identifiable, Codable {
     var time: Date?
     var endTime: Date?   // Время окончания задачи
     var checklist: [ChecklistItem]?
+    var status: TaskStatus = .normal
     
     init(id: String = UUID().uuidString,
          title: String,
@@ -31,7 +39,8 @@ struct Task: Identifiable, Codable {
          description: String? = nil,
          time: Date? = nil,
          endTime: Date? = nil,
-         checklist: [ChecklistItem]? = nil) {
+         checklist: [ChecklistItem]? = nil,
+         status: TaskStatus = .normal) {
         self.id = id
         self.title = title
         self.type = type
@@ -43,5 +52,6 @@ struct Task: Identifiable, Codable {
         self.time = time
         self.endTime = endTime
         self.checklist = checklist
+        self.status = status
     }
 }

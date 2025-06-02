@@ -181,6 +181,7 @@ struct AddTaskView: View {
         content.title = viewModel.title
         content.body = descriptionText.isEmpty ? "Время выполнить задачу" : descriptionText
         content.sound = .default
+        content.categoryIdentifier = "TASK_CATEGORY"
         
         // Преобразуем пользовательский индекс дня недели в формат iOS
         // В приложении: 1 — понедельник, 7 — воскресенье
@@ -268,8 +269,8 @@ struct AddTaskView: View {
                         return false
                     }
                 } else {
-                    // Если новая задача с интервалом, проверяем, не попадает ли существующая задача в новый интервал
-                    if newStartMinutes >= existingStartMinutes && newStartMinutes < newEndMinutes {
+                    // Если новая задача с интервалом, проверяем, не попадает ли существующая задача без интервала в новый интервал
+                    if existingStartMinutes >= newStartMinutes && existingStartMinutes < newEndMinutes {
                         return false
                     }
                 }

@@ -192,8 +192,8 @@ struct TaskRow: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.isCompleted ? .green : .gray)
+            Image(systemName: task.isCompleted || task.status == .done ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(task.status == .done ? .green : task.status == .snoozed ? .orange : task.status == .cancelled ? .red : task.isCompleted ? .green : .gray)
                 .font(.title2)
             Image(systemName: task.type.icon)
                 .foregroundColor(.accentColor)
@@ -203,13 +203,13 @@ struct TaskRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
                     .font(.headline)
-                    .foregroundColor(.primary)
-                    .strikethrough(task.isCompleted)
+                    .foregroundColor(task.status == .cancelled ? .red : .primary)
+                    .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
                 if let description = task.description, !description.isEmpty {
                     Text(description)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .strikethrough(task.isCompleted)
+                        .foregroundColor(task.status == .cancelled ? .red : .secondary)
+                        .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
                 }
                 if let time = task.time {
                     HStack(spacing: 4) {
@@ -232,7 +232,12 @@ struct TaskRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(task.isCompleted ? Color.green.opacity(0.18) : Color(.systemGray5))
+                .fill(
+                    task.status == .done ? Color.green.opacity(0.18) :
+                    task.status == .snoozed ? Color.orange.opacity(0.18) :
+                    task.status == .cancelled ? Color.red.opacity(0.18) :
+                    task.isCompleted ? Color.green.opacity(0.18) : Color(.systemGray5)
+                )
         )
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
