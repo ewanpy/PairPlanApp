@@ -112,6 +112,9 @@ struct EditTaskView: View {
                 .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             )
         }
+        .sheet(isPresented: $showChecklistEditor) {
+            ChecklistEditorView(checklist: $checklist)
+        }
     }
 } 
 

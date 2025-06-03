@@ -17,10 +17,12 @@ struct TaskListView: View {
     @State private var selectedTaskTypes: Set<TaskType> = Set(TaskType.allCases)
     /// Задача, выбранная для редактирования
     @State private var editingTask: Task? = nil
-    /// Флаг отображения экрана чеклиста
+    /// Флаг отображения экрана чеклиста (только просмотр)
     @State private var showChecklistSheet = false
-    /// Задача, чеклист которой просматривается
+    /// Задача, чеклист которой просматривается (только просмотр)
     @State private var checklistTask: Task? = nil
+    /// Задача для редактирования чеклиста
+    @State private var editingChecklistTask: Task? = nil
     /// Выбранный день недели (1 = Пн, 7 = Вс)
     @State private var selectedWeekday: Int = 1 // по умолчанию Пн
     /// Текущий пользователь (id)
@@ -60,6 +62,7 @@ struct TaskListView: View {
                     TaskRow(
                         task: task,
                         currentUserId: currentUserId,
+                        sessionCode: sessionCode,
                         onToggleComplete: {
                             viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task)
                         },
@@ -70,6 +73,9 @@ struct TaskListView: View {
                         onChecklist: {
                             checklistTask = task
                             showChecklistSheet = true
+                        },
+                        onEditChecklist: {
+                            editingChecklistTask = task
                         }
                     )
                     .listRowBackground(Color.clear)
@@ -112,6 +118,11 @@ struct TaskListView: View {
         .sheet(isPresented: $showChecklistSheet) {
             if let checklistTask = checklistTask, let binding = bindingForTask(withId: checklistTask.id) {
                 ChecklistMarkView(checklist: binding, isReadOnly: checklistTask.userId != currentUserId)
+            }
+        }
+        .sheet(item: $editingChecklistTask) { task in
+            if let binding = bindingForTask(withId: task.id) {
+                ChecklistEditorView(checklist: binding)
             }
         }
         // Загрузка задач при появлении экрана
@@ -176,6 +187,8 @@ struct TaskRow: View {
     let task: Task
     /// ID текущего пользователя (для определения владельца задачи)
     let currentUserId: String
+    /// Код сессии
+    let sessionCode: String
     /// Callback для переключения выполнения задачи
     let onToggleComplete: () -> Void
     /// Флаг индивидуального режима (меняет стиль отображения)
@@ -188,13 +201,21 @@ struct TaskRow: View {
     let onDelete: () -> Void
     /// Callback для открытия чеклиста задачи
     let onChecklist: () -> Void
+    /// Callback для редактирования чеклиста задачи
+    let onEditChecklist: () -> Void
     @State private var isPressed = false
     
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: task.isCompleted || task.status == .done ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.status == .done ? .green : task.status == .snoozed ? .orange : task.status == .cancelled ? .red : task.isCompleted ? .green : .gray)
-                .font(.title2)
+            if task.status == .cancelled {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.red)
+                    .font(.title2)
+            } else {
+                Image(systemName: task.isCompleted || task.status == .done ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(task.status == .done ? .green : task.status == .snoozed ? .orange : task.isCompleted ? .green : .gray)
+                    .font(.title2)
+            }
             Image(systemName: task.type.icon)
                 .foregroundColor(.accentColor)
                 .font(.title2)
@@ -244,13 +265,35 @@ struct TaskRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                isPressed = true
-                onToggleComplete()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    isPressed = false
+            if task.status != .cancelled {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isPressed = true
+                    onToggleComplete()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        isPressed = false
+                    }
                 }
             }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button(action: {
+                // Отменить задачу (красный)
+                var updatedTask = task
+                updatedTask.status = .cancelled
+                FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+            }) {
+                Label("Отменить", systemImage: "xmark.circle")
+            }.tint(.red)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(action: {
+                // Отложить задачу (оранжевый)
+                var updatedTask = task
+                updatedTask.status = .snoozed
+                FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+            }) {
+                Label("Отложить", systemImage: "clock.arrow.circlepath")
+            }.tint(.orange)
         }
         .contextMenu {
             Button(action: onEdit) {
@@ -259,8 +302,10 @@ struct TaskRow: View {
             Button(role: .destructive, action: onDelete) {
                 Label("Удалить", systemImage: "trash")
             }
-            Button(action: onChecklist) {
-                Label("Чеклист", systemImage: "checklist")
+            if let checklist = task.checklist, !checklist.isEmpty {
+                Button(action: onChecklist) {
+                    Label("Чеклист", systemImage: "checklist")
+                }
             }
         }
     }
