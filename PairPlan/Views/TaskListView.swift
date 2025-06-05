@@ -70,10 +70,7 @@ struct TaskListView: View {
                         previousUserId: nil, // Можно реализовать если нужно
                         onEdit: { editingTask = task },
                         onDelete: { deleteTaskById(task.id) },
-                        onChecklist: {
-                            checklistTask = task
-                            showChecklistSheet = true
-                        },
+                        onChecklist: { checklistTask = task },
                         onEditChecklist: {
                             editingChecklistTask = task
                         }
@@ -115,9 +112,9 @@ struct TaskListView: View {
             }
         }
         // Экран просмотра чеклиста
-        .sheet(isPresented: $showChecklistSheet) {
-            if let checklistTask = checklistTask, let binding = bindingForTask(withId: checklistTask.id) {
-                ChecklistMarkView(checklist: binding, isReadOnly: checklistTask.userId != currentUserId)
+        .sheet(item: $checklistTask) { task in
+            if let binding = bindingForTask(withId: task.id) {
+                ChecklistMarkView(checklist: binding, isReadOnly: task.userId != currentUserId)
             }
         }
         .sheet(item: $editingChecklistTask) { task in
@@ -158,8 +155,10 @@ struct TaskListView: View {
             get: { viewModel.tasks[idx].checklist ?? [] },
             set: { newValue in
                 var updatedTask = viewModel.tasks[idx]
-                updatedTask.checklist = newValue
+                updatedTask.checklist = newValue.isEmpty ? nil : newValue
                 FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+                // Обновляем локально, чтобы sheet сразу отобразил изменения
+                viewModel.tasks[idx].checklist = newValue.isEmpty ? nil : newValue
             }
         )
     }
