@@ -10,6 +10,8 @@ struct SessionView: View {
     @State private var createButtonPressed = false
     @State private var modeSelectionMade = false
     @State private var recentJoinButtonPressed: String? = nil
+    @State private var showLogoutAlert = false
+    var onLogout: (() -> Void)? = nil
     
     var body: some View {
         NavigationView {
@@ -47,22 +49,22 @@ struct SessionView: View {
                             .padding(.top, 40)
                             
                             // Recent Sessions
-                            if !viewModel.recentSessions.isEmpty {
+                            if !viewModel.mySessions.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
                                         Image(systemName: "clock.arrow.circlepath")
                                             .foregroundColor(.accentColor)
                                             .font(.title2)
-                                        Text("Недавние сессии")
+                                        Text("Мои сессии")
                                             .font(.headline)
                                         Spacer()
-                                        Button(action: { viewModel.clearRecentSessions() }) {
-                                            Image(systemName: "trash")
-                                                .foregroundColor(.red)
+                                        Button(action: { viewModel.loadMySessions() }) {
+                                            Image(systemName: "arrow.clockwise")
+                                                .foregroundColor(.accentColor)
                                         }
-                                        .accessibilityLabel("Очистить недавние сессии")
+                                        .accessibilityLabel("Обновить список сессий")
                                     }
-                                    ForEach(viewModel.recentSessions, id: \.self) { code in
+                                    ForEach(viewModel.mySessions) { session in
                                         HStack(spacing: 12) {
                                             Image(systemName: "rectangle.stack.person.crop")
                                                 .foregroundColor(.accentColor)
@@ -71,13 +73,24 @@ struct SessionView: View {
                                                 Text("Сессия")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
-                                                Text(code)
-                                                    .font(.headline)
-                                                    .foregroundColor(.primary)
-                                                    .lineLimit(1)
+                                                HStack(spacing: 8) {
+                                                    Text(session.code)
+                                                        .font(.headline)
+                                                        .foregroundColor(.primary)
+                                                        .lineLimit(1)
+                                                    Text(session.mode == .shared ? "Общий" : "Индивидуальный")
+                                                        .font(.caption)
+                                                        .foregroundColor(session.mode == .shared ? .blue : .orange)
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 2)
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 8)
+                                                                .fill((session.mode == .shared ? Color.blue.opacity(0.12) : Color.orange.opacity(0.12)))
+                                                        )
+                                                }
                                             }
                                             Spacer()
-                                            Button(action: { viewModel.removeRecentSession(code) }) {
+                                            Button(action: { /* Можно добавить удаление сессии */ }) {
                                                 Image(systemName: "xmark.circle.fill")
                                                     .foregroundColor(.secondary)
                                             }
@@ -91,10 +104,10 @@ struct SessionView: View {
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
-                                                recentJoinButtonPressed = code
+                                                recentJoinButtonPressed = session.code
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                                     recentJoinButtonPressed = nil
-                                                    viewModel.joinSession(code: code)
+                                                    viewModel.joinSession(code: session.code)
                                                 }
                                             }
                                         }
@@ -202,6 +215,27 @@ struct SessionView: View {
                     }
                     .navigationTitle("PairPlan")
                 }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !viewModel.joined {
+                        Button(action: {
+                            showLogoutAlert = true
+                        }) {
+                            Label("Выйти", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    }
+                }
+            }
+            .alert(isPresented: $showLogoutAlert) {
+                Alert(
+                    title: Text("Выйти из аккаунта?"),
+                    message: Text("Вы уверены, что хотите выйти?"),
+                    primaryButton: .destructive(Text("Выйти")) {
+                        onLogout?()
+                    },
+                    secondaryButton: .cancel(Text("Отмена"))
+                )
             }
         }
         .sheet(isPresented: $showModeSelection, onDismiss: {

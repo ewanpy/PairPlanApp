@@ -12,12 +12,13 @@ class FirestoreManager {
     // MARK: - Session Management
     
     /// Создаёт новую сессию
-    func createSession(code: String, mode: SessionMode, completion: @escaping (Error?) -> Void) {
+    func createSession(code: String, mode: SessionMode, ownerId: String, completion: @escaping (Error?) -> Void) {
         let sessionData: [String: Any] = [
             "code": code,
             "mode": mode.rawValue,
             "createdAt": FieldValue.serverTimestamp(),
-            "participants": []
+            "participants": [],
+            "ownerId": ownerId
         ]
         
         db.collection("sessions").document(code).setData(sessionData) { error in
@@ -105,6 +106,25 @@ class FirestoreManager {
             return nil
         } completion: { _, error in
             completion(error)
+        }
+    }
+    
+    /// Загружает сессии только для конкретного пользователя
+    func loadSessions(for userId: String, completion: @escaping ([Session]) -> Void) {
+        db.collection("sessions").whereField("ownerId", isEqualTo: userId).getDocuments { snapshot, error in
+            guard let documents = snapshot?.documents else {
+                completion([])
+                return
+            }
+            let sessions = documents.compactMap { doc -> Session? in
+                let data = doc.data()
+                guard let code = data["code"] as? String,
+                      let modeString = data["mode"] as? String,
+                      let mode = SessionMode(rawValue: modeString),
+                      let ownerId = data["ownerId"] as? String else { return nil }
+                return Session(code: code, mode: mode, ownerId: ownerId)
+            }
+            completion(sessions)
         }
     }
     

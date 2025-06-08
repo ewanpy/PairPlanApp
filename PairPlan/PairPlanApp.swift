@@ -5,11 +5,9 @@ import UserNotifications
 @main
 struct PairPlanApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var isAuthenticated: Bool = false
     
     init() {
-        // Configure Firebase
-        FirebaseApp.configure()
-        
         // Запрашиваем разрешение на уведомления при запуске приложения
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
@@ -22,15 +20,31 @@ struct PairPlanApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SessionView()
-                .environmentObject(SessionViewModel())
+            Group {
+                if isAuthenticated {
+                    SessionView(onLogout: {
+                        do {
+                            try AuthManager.shared.logout()
+                        } catch {
+                            print("Ошибка выхода из аккаунта:", error)
+                        }
+                        isAuthenticated = false
+                    })
+                    .environmentObject(SessionViewModel())
+                } else {
+                    AuthView(isAuthenticated: $isAuthenticated)
+                }
+            }
+            .onAppear {
+                isAuthenticated = AuthManager.shared.currentUser != nil
+            }
         }
     }
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        // Устанавливаем делегат для обработки уведомлений
+        FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         registerNotificationCategories()
         return true

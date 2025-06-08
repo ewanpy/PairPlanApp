@@ -15,6 +15,8 @@ class SessionViewModel: ObservableObject {
     private let recentSessionsKey = "PairPlan.recentSessions"
     @Published var recentSessions: [String] = []
 
+    @Published var mySessions: [Session] = []
+
     init() {
         // При первом запуске сохраняем UUID, затем читаем его при каждом старте
         if let saved = UserDefaults.standard.string(forKey: userIdKey) {
@@ -28,6 +30,7 @@ class SessionViewModel: ObservableObject {
         if let saved = UserDefaults.standard.array(forKey: recentSessionsKey) as? [String] {
             recentSessions = saved
         }
+        loadMySessions()
     }
 
     // MARK: — Session lifecycle
@@ -38,14 +41,12 @@ class SessionViewModel: ObservableObject {
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()!
         })
         self.mode = mode
-        // 1) Создаём сессию в Firestore
-        FirestoreManager.shared.createSession(code: code, mode: mode) { error in
+        FirestoreManager.shared.createSession(code: code, mode: mode, ownerId: currentUserId) { error in
             DispatchQueue.main.async {
                 if let err = error {
                     self.errorMessage = err.localizedDescription
                     return
                 }
-                // 2) Пытаемся добавить себя в participants
                 FirestoreManager.shared.addParticipant(
                     sessionCode: code,
                     userId: self.currentUserId,
@@ -60,6 +61,7 @@ class SessionViewModel: ObservableObject {
                             self.sessionCode = code
                             self.joined = true
                             self.addRecentSession(code)
+                            self.loadMySessions()
                         }
                     }
                 }
@@ -145,4 +147,19 @@ class SessionViewModel: ObservableObject {
         recentSessions = []
         UserDefaults.standard.removeObject(forKey: recentSessionsKey)
     }
+
+    func loadMySessions() {
+        FirestoreManager.shared.loadSessions(for: currentUserId) { sessions in
+            DispatchQueue.main.async {
+                self.mySessions = sessions
+            }
+        }
+    }
+}
+
+struct Session: Identifiable {
+    var id: String { code }
+    let code: String
+    let mode: SessionMode
+    let ownerId: String
 }
