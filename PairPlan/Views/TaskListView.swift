@@ -78,9 +78,6 @@ struct TaskListView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
-                .onDelete { offsets in
-                    viewModel.deleteTasks(at: offsets)
-                }
             }
             .listStyle(PlainListStyle())
         }
@@ -204,6 +201,23 @@ struct TaskRow: View {
     let onEditChecklist: () -> Void
     @State private var isPressed = false
     
+    // Новый вычисляемый цвет фона
+    var backgroundColor: Color {
+        if isIndividual {
+            return task.userId == currentUserId ? Color.blue.opacity(0.12) : Color.purple.opacity(0.12)
+        } else if task.status == .done {
+            return Color.green.opacity(0.18)
+        } else if task.status == .snoozed {
+            return Color.orange.opacity(0.18)
+        } else if task.status == .cancelled {
+            return Color.red.opacity(0.18)
+        } else if task.isCompleted {
+            return Color.green.opacity(0.18)
+        } else {
+            return Color(.systemGray5)
+        }
+    }
+    
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             if task.status == .cancelled {
@@ -220,17 +234,28 @@ struct TaskRow: View {
                 .font(.title2)
                 .frame(width: 36, height: 36)
                 .background(Circle().fill(Color.accentColor.opacity(0.12)))
+            
             VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.headline)
-                    .foregroundColor(task.status == .cancelled ? .red : .primary)
-                    .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
+                HStack {
+                    Text(task.title)
+                        .font(.headline)
+                        .foregroundColor(task.status == .cancelled ? .red : .primary)
+                        .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
+                    
+                    if isIndividual {
+                        Image(systemName: task.userId == currentUserId ? "person.fill" : "person.2.fill")
+                            .foregroundColor(task.userId == currentUserId ? .blue : .purple)
+                            .font(.caption)
+                    }
+                }
+                
                 if let description = task.description, !description.isEmpty {
                     Text(description)
                         .font(.subheadline)
                         .foregroundColor(task.status == .cancelled ? .red : .secondary)
                         .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
                 }
+                
                 if let time = task.time {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
@@ -252,19 +277,15 @@ struct TaskRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(
-                    task.status == .done ? Color.green.opacity(0.18) :
-                    task.status == .snoozed ? Color.orange.opacity(0.18) :
-                    task.status == .cancelled ? Color.red.opacity(0.18) :
-                    task.isCompleted ? Color.green.opacity(0.18) : Color(.systemGray5)
-                )
+                .fill(backgroundColor)
         )
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
+        // Отметка выполнения только для своих задач
         .onTapGesture {
-            if task.status != .cancelled {
+            if task.status != .cancelled && (!isIndividual || task.userId == currentUserId) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isPressed = true
                     onToggleComplete()
@@ -274,32 +295,40 @@ struct TaskRow: View {
                 }
             }
         }
+        // SwipeActions только для своих задач
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            Button(action: {
-                // Отменить задачу (красный)
-                var updatedTask = task
-                updatedTask.status = .cancelled
-                FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
-            }) {
-                Label("Отменить", systemImage: "xmark.circle")
-            }.tint(.red)
+            if !isIndividual || task.userId == currentUserId {
+                Button(action: {
+                    // Отменить задачу (красный)
+                    var updatedTask = task
+                    updatedTask.status = .cancelled
+                    FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+                }) {
+                    Label("Отменить", systemImage: "xmark.circle")
+                }.tint(.red)
+            }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(action: {
-                // Отложить задачу (оранжевый)
-                var updatedTask = task
-                updatedTask.status = .snoozed
-                FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
-            }) {
-                Label("Отложить", systemImage: "clock.arrow.circlepath")
-            }.tint(.orange)
-        }
-        .contextMenu {
-            Button(action: onEdit) {
-                Label("Редактировать", systemImage: "pencil")
+            if !isIndividual || task.userId == currentUserId {
+                Button(action: {
+                    // Отложить задачу (оранжевый)
+                    var updatedTask = task
+                    updatedTask.status = .snoozed
+                    FirestoreManager.shared.addTask(sessionCode: sessionCode, task: updatedTask) { _ in }
+                }) {
+                    Label("Отложить", systemImage: "clock.arrow.circlepath")
+                }.tint(.orange)
             }
-            Button(role: .destructive, action: onDelete) {
-                Label("Удалить", systemImage: "trash")
+        }
+        // Контекстное меню только для своих задач (редактировать, удалить)
+        .contextMenu {
+            if !isIndividual || task.userId == currentUserId {
+                Button(action: onEdit) {
+                    Label("Редактировать", systemImage: "pencil")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Удалить", systemImage: "trash")
+                }
             }
             if let checklist = task.checklist, !checklist.isEmpty {
                 Button(action: onChecklist) {
