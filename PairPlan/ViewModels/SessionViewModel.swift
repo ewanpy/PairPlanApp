@@ -155,6 +155,22 @@ class SessionViewModel: ObservableObject {
             }
         }
     }
+
+    /// Удаляет сессию и обновляет список сессий
+    func deleteSession(_ session: Session) {
+        FirestoreManager.shared.deleteSession(code: session.code) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self?.errorMessage = error.localizedDescription
+                } else {
+                    // Удаляем сессию из локального списка
+                    self?.mySessions.removeAll { $0.code == session.code }
+                    // Удаляем из недавних сессий
+                    self?.removeRecentSession(session.code)
+                }
+            }
+        }
+    }
 }
 
 struct Session: Identifiable {

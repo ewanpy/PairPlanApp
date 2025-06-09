@@ -128,6 +128,32 @@ class FirestoreManager {
         }
     }
     
+    /// Удаляет сессию из Firestore
+    func deleteSession(code: String, completion: @escaping (Error?) -> Void) {
+        // Сначала удаляем все задачи в сессии
+        db.collection("sessions").document(code)
+            .collection("tasks").getDocuments { snapshot, error in
+                if let error = error {
+                    completion(error)
+                    return
+                }
+                
+                // Удаляем все задачи
+                let batch = self.db.batch()
+                snapshot?.documents.forEach { doc in
+                    batch.deleteDocument(doc.reference)
+                }
+                
+                // Затем удаляем саму сессию
+                batch.deleteDocument(self.db.collection("sessions").document(code))
+                
+                // Выполняем все операции в одной транзакции
+                batch.commit { error in
+                    completion(error)
+                }
+            }
+    }
+    
     // MARK: - Task Management
     
     /// Добавляет задачу в Firestore

@@ -90,10 +90,11 @@ struct SessionView: View {
                                                 }
                                             }
                                             Spacer()
-                                            Button(action: { /* Можно добавить удаление сессии */ }) {
+                                            Button(action: { viewModel.deleteSession(session) }) {
                                                 Image(systemName: "xmark.circle.fill")
                                                     .foregroundColor(.secondary)
                                             }
+                                            .accessibilityLabel("Удалить сессию")
                                         }
                                         .padding(12)
                                         .background(
