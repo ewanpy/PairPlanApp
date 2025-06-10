@@ -15,6 +15,11 @@ struct SessionView: View {
     @State private var showAccountMenu = false
     var onLogout: (() -> Void)? = nil
     @Binding var appColorScheme: ColorScheme?
+    @State private var username: String = ""
+    @State private var isLoadingUsername = false
+    @State private var showJoinByCode = false
+    @State private var joinCode: String = ""
+    @State private var showSavedSessions = false
     
     var body: some View {
         NavigationView {
@@ -46,180 +51,63 @@ struct SessionView: View {
                     // Экран создания/присоединения к сессии
                     ScrollView {
                         VStack(spacing: 24) {
-                            // Header
-                            VStack(spacing: 8) {
-                                Image(systemName: "calendar.badge.plus")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.accentColor)
-                                Text("Совместное планирование")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                            }
-                            .padding(.top, 40)
-                            
-                            // Recent Sessions
-                            if !viewModel.mySessions.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        Image(systemName: "clock.arrow.circlepath")
-                                            .foregroundColor(.accentColor)
-                                            .font(.title2)
-                                        Text("Мои сессии")
-                                            .font(.headline)
-                                        Spacer()
-                                        Button(action: { viewModel.loadMySessions() }) {
-                                            Image(systemName: "arrow.clockwise")
-                                                .foregroundColor(.accentColor)
-                                        }
-                                        .accessibilityLabel("Обновить список сессий")
-                                    }
-                                    ForEach(viewModel.mySessions) { session in
-                                        HStack(spacing: 12) {
-                                            Image(systemName: "rectangle.stack.person.crop")
-                                                .foregroundColor(.accentColor)
-                                                .font(.title3)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Сессия")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                HStack(spacing: 8) {
-                                                    Text(session.code)
-                                                        .font(.headline)
-                                                        .foregroundColor(.primary)
-                                                        .lineLimit(1)
-                                                    Text(session.mode == .shared ? "Общий" : "Индивидуальный")
-                                                        .font(.caption)
-                                                        .foregroundColor(session.mode == .shared ? .blue : .orange)
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 2)
-                                                        .background(
-                                                            RoundedRectangle(cornerRadius: 8)
-                                                                .fill((session.mode == .shared ? Color.blue.opacity(0.12) : Color.orange.opacity(0.12)))
-                                                        )
-                                                }
-                                            }
-                                            Spacer()
-                                            Button(action: { viewModel.deleteSession(session) }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            .accessibilityLabel("Удалить сессию")
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                .fill(Color(.systemBackground))
-                                                .shadow(color: Color(.black).opacity(0.08), radius: 4, x: 0, y: 2)
-                                        )
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
-                                                recentJoinButtonPressed = session.code
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                                    recentJoinButtonPressed = nil
-                                                    viewModel.joinSession(code: session.code)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                            
-                            // Session Code Input
-                            VStack(spacing: 16) {
-                                HStack {
-                                    Image(systemName: "key.fill")
+                            // Приветствие и аватар
+                            HStack(alignment: .center, spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.accentColor.opacity(0.15))
+                                        .frame(width: 56, height: 56)
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .frame(width: 48, height: 48)
                                         .foregroundColor(.accentColor)
-                                    TextField("Код сессии", text: $viewModel.sessionCode)
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                .fill(Color(.systemGray6))
-                                                .shadow(color: Color(.black).opacity(0.08), radius: 2, x: 0, y: 2)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                                        )
-                                        .frame(maxWidth: 220)
-                                        .submitLabel(.done)
-                                        .onSubmit {
-                                            UIApplication.shared.sendAction(
-                                                #selector(UIResponder.resignFirstResponder),
-                                                to: nil, from: nil, for: nil
-                                            )
-                                        }
                                 }
-                                
-                                HStack(spacing: 20) {
-                                    Button {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
-                                            createButtonPressed.toggle()
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                                createButtonPressed.toggle()
-                                                showModeSelection = true
-                                            }
-                                        }
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "plus.circle.fill")
-                                                .font(.headline)
-                                            Text("Создать")
-                                                .font(.headline)
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.8)
-                                                .clipped()
-                                        }
-                                        .padding(.vertical, 14)
-                                        .frame(maxWidth: .infinity)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.accentColor)
-                                        )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if isLoadingUsername {
+                                        ProgressView().frame(height: 20)
+                                    } else {
+                                        Text("Добро пожаловать,\n\(username.isEmpty ? "пользователь" : username)!")
+                                            .font(.title2)
+                                            .fontWeight(.semibold)
+                                            .lineLimit(2)
                                     }
-                                    .foregroundColor(.white)
-                                    .scaleEffect(createButtonPressed ? 0.95 : 1.0)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: createButtonPressed)
-                                    
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.5)) {
-                                            joinButtonPressed.toggle()
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                                joinButtonPressed.toggle()
-                                                viewModel.joinSession(code: viewModel.sessionCode)
-                                            }
-                                        }
-                                    }) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "person.badge.plus")
-                                                .font(.headline)
-                                            Text("Вступить")
-                                                .font(.headline)
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.8)
-                                                .clipped()
-                                        }
-                                        .padding(.vertical, 14)
-                                        .frame(maxWidth: .infinity)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.accentColor)
-                                        )
-                                    }
-                                    .foregroundColor(.white)
-                                    .scaleEffect(joinButtonPressed ? 0.95 : 1.0)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: joinButtonPressed)
                                 }
-                                .padding(.horizontal)
+                                Spacer()
                             }
-                            
-                            if let error = viewModel.errorMessage {
-                                Text(error)
-                                    .foregroundColor(.red)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
+                            .padding(.top, 32)
+                            // Блок быстрых действий
+                            HStack(spacing: 16) {
+                                QuickActionButton(
+                                    title: "Создать\nсессию",
+                                    systemImage: "plus.circle",
+                                    foregroundColor: Color.blue,
+                                    backgroundColor: Color.blue.opacity(0.08),
+                                    action: { showModeSelection = true }
+                                )
+                                QuickActionButton(
+                                    title: "Войти\nпо коду",
+                                    systemImage: "key.fill",
+                                    foregroundColor: Color.blue,
+                                    backgroundColor: Color.blue.opacity(0.08),
+                                    action: { showJoinByCode = true }
+                                )
+                                QuickActionButton(
+                                    title: "Мои\nсессии",
+                                    systemImage: "rectangle.stack.person.crop",
+                                    foregroundColor: Color.orange,
+                                    backgroundColor: Color.orange.opacity(0.12),
+                                    action: {
+                                        showSavedSessions = true
+                                        viewModel.loadMySessions()
+                                    }
+                                )
                             }
+                            // Блок последних сессий
+                            RecentSessionsBlock(
+                                recentCodes: viewModel.recentSessions,
+                                allSessions: viewModel.mySessions,
+                                onJoin: { code in viewModel.joinSession(code: code) }
+                            )
                         }
                         .padding(.bottom, 40)
                     }
@@ -236,6 +124,9 @@ struct SessionView: View {
                     .sheet(isPresented: $showAccountMenu) {
                         AccountMenuView(onLogout: onLogout, appColorScheme: $appColorScheme)
                     }
+                    .onAppear {
+                        loadUsername()
+                    }
                 }
             }
             .alert(isPresented: $showLogoutAlert) {
@@ -248,6 +139,12 @@ struct SessionView: View {
                     secondaryButton: .cancel(Text("Отмена"))
                 )
             }
+        }
+        .sheet(isPresented: $showJoinByCode) {
+            JoinByCodeSheet(joinCode: $joinCode, onJoin: { code in
+                viewModel.joinSession(code: code)
+                showJoinByCode = false
+            })
         }
         .sheet(isPresented: $showModeSelection, onDismiss: {
             modeSelectionMade = false
@@ -335,6 +232,29 @@ struct SessionView: View {
                 .navigationBarItems(trailing: Button("Готово") {
                     showTaskTypeSelection = false
                 })
+            }
+        }
+        .sheet(isPresented: $showSavedSessions) {
+            SavedSessionsSheet(
+                sessions: viewModel.mySessions,
+                onJoin: { code in
+                    viewModel.joinSession(code: code)
+                    showSavedSessions = false
+                },
+                onDelete: { session in
+                    viewModel.deleteSession(session)
+                }
+            )
+        }
+    }
+    
+    private func loadUsername() {
+        guard let userId = UserDefaults.standard.string(forKey: "PairPlan.currentUserId") else { return }
+        isLoadingUsername = true
+        FirestoreManager.shared.getUsername(userId: userId) { name in
+            DispatchQueue.main.async {
+                self.username = name ?? ""
+                self.isLoadingUsername = false
             }
         }
     }
@@ -505,5 +425,204 @@ struct SettingsView: View {
                 selectedTheme = 0
             }
         }
+    }
+}
+
+// Новый sheet для ввода кода сессии
+struct JoinByCodeSheet: View {
+    @Binding var joinCode: String
+    var onJoin: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var error: String? = nil
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                Text("Ввести код сессии")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .padding(.top, 24)
+                HStack {
+                    Image(systemName: "key.fill")
+                        .foregroundColor(.accentColor)
+                    TextField("Код сессии", text: $joinCode)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .autocapitalization(.allCharacters)
+                        .disableAutocorrection(true)
+                        .frame(maxWidth: 180)
+                }
+                .padding(.horizontal)
+                if let error = error {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.callout)
+                }
+                Button(action: {
+                    if joinCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        error = "Введите код сессии"
+                    } else {
+                        onJoin(joinCode)
+                        dismiss()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "person.badge.plus")
+                        Text("Вступить")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor))
+                    .foregroundColor(.white)
+                }
+                .padding(.horizontal)
+                Spacer()
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// Новый sheet для сохранённых сессий
+struct SavedSessionsSheet: View {
+    let sessions: [Session]
+    var onJoin: (String) -> Void
+    var onDelete: (Session) -> Void
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationView {
+            List {
+                if sessions.isEmpty {
+                    Text("Нет сохранённых сессий")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(sessions) { session in
+                        HStack(spacing: 12) {
+                            Image(systemName: "rectangle.stack.person.crop")
+                                .foregroundColor(.accentColor)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Сессия")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                HStack(spacing: 8) {
+                                    Text(session.code)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                    Text(session.mode == .shared ? "Общий" : "Индивидуальный")
+                                        .font(.caption)
+                                        .foregroundColor(session.mode == .shared ? .blue : .orange)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill((session.mode == .shared ? Color.blue.opacity(0.12) : Color.orange.opacity(0.12)))
+                                        )
+                                }
+                            }
+                            Spacer()
+                            Button(action: { onJoin(session.code) }) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .onDelete { indexSet in
+                        for index in indexSet {
+                            onDelete(sessions[index])
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Сохранённые сессии")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+            .environment(\ .editMode, .constant(.active)) // Включить свайп для удаления
+        }
+    }
+}
+
+// Новый компонент для квадратных быстрых кнопок
+struct QuickActionButton: View {
+    let title: String
+    let systemImage: String
+    let foregroundColor: Color
+    let backgroundColor: Color
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(foregroundColor)
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(foregroundColor)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(width: 110, height: 110)
+            .background(RoundedRectangle(cornerRadius: 20).fill(backgroundColor))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// Блок последних сессий
+struct RecentSessionsBlock: View {
+    let recentCodes: [String]
+    let allSessions: [Session]
+    var onJoin: (String) -> Void
+    var body: some View {
+        let recentSessions = recentCodes.compactMap { code in allSessions.first(where: { $0.code == code }) }.prefix(2)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Последние сессии")
+                .font(.headline)
+                .padding(.horizontal, 8)
+            if recentSessions.isEmpty {
+                Text("Нет недавних сессий")
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+            } else {
+                ForEach(Array(recentSessions), id: \ .code) { session in
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.stack.person.crop")
+                            .foregroundColor(.accentColor)
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.code)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Text(session.mode == .shared ? "Общий режим" : "Индивидуальный режим")
+                                .font(.caption)
+                                .foregroundColor(session.mode == .shared ? .blue : .orange)
+                        }
+                        Spacer()
+                        Button(action: { onJoin(session.code) }) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
+                }
+            }
+        }
+        .padding(.top, 8)
+        .padding(.horizontal)
     }
 }
