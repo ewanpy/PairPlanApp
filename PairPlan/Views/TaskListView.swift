@@ -9,10 +9,10 @@ struct TaskListView: View {
     let sessionCode: String
     /// Режим сессии (shared/individual)
     let mode: SessionMode
+    /// Флаг отображения экрана добавления задачи
+    @Binding var showAddTask: Bool
     /// ViewModel для работы со списком задач
     @StateObject private var viewModel = TaskListViewModel()
-    /// Флаг отображения экрана добавления задачи
-    @State private var showingAddTask = false
     /// Выбранные типы задач для фильтрации
     @State private var selectedTaskTypes: Set<TaskType> = Set(TaskType.allCases)
     /// Задача, выбранная для редактирования
@@ -29,6 +29,8 @@ struct TaskListView: View {
     private var currentUserId: String {
         UserDefaults.standard.string(forKey: "PairPlan.currentUserId") ?? ""
     }
+    /// Доступ к SessionViewModel для username-кэша
+    @EnvironmentObject var sessionVM: SessionViewModel
     
     var body: some View {
         VStack {
@@ -73,7 +75,8 @@ struct TaskListView: View {
                         onChecklist: { checklistTask = task },
                         onEditChecklist: {
                             editingChecklistTask = task
-                        }
+                        },
+                        userName: sessionVM.userIdToUsername[task.userId]
                     )
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -83,16 +86,8 @@ struct TaskListView: View {
         }
         .background(Color(.systemGray6).ignoresSafeArea())
         .navigationTitle("Сессия \(sessionCode)")
-        .toolbar {
-            // Кнопка добавления задачи
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingAddTask = true }) {
-                    Image(systemName: "plus")
-                }
-            }
-        }
         // Экран добавления задачи
-        .sheet(isPresented: $showingAddTask) {
+        .sheet(isPresented: $showAddTask) {
             let dayTasks = viewModel.tasks.filter { $0.weekday == selectedWeekday }
             AddTaskView(
                 sessionCode: sessionCode,
@@ -123,6 +118,14 @@ struct TaskListView: View {
         .onAppear {
             selectedWeekday = getCurrentWeekday()
             viewModel.loadTasks(for: sessionCode)
+            if mode == .individual {
+                sessionVM.fetchUsernamesIfNeeded(for: viewModel.tasks)
+            }
+        }
+        .onChange(of: viewModel.tasks) { tasks in
+            if mode == .individual {
+                sessionVM.fetchUsernamesIfNeeded(for: tasks)
+            }
         }
     }
 
@@ -199,12 +202,17 @@ struct TaskRow: View {
     let onChecklist: () -> Void
     /// Callback для редактирования чеклиста задачи
     let onEditChecklist: () -> Void
+    /// Username пользователя задачи
+    let userName: String?
     @State private var isPressed = false
     
     // Новый вычисляемый цвет фона
     var backgroundColor: Color {
         if isIndividual {
-            return task.userId == currentUserId ? Color.blue.opacity(0.12) : Color.purple.opacity(0.12)
+            if task.isCompleted || task.status == .done {
+                return task.userId == currentUserId ? Color.green.opacity(0.25) : Color.purple.opacity(0.25)
+            }
+            return task.userId == currentUserId ? Color(.systemBackground) : Color.orange.opacity(0.12)
         } else if task.status == .done {
             return Color.green.opacity(0.18)
         } else if task.status == .snoozed {
@@ -220,42 +228,63 @@ struct TaskRow: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            if task.status == .cancelled {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.red)
-                    .font(.title2)
+            // Цветной кружок с инициалом пользователя только в индивидуальном режиме
+            if isIndividual {
+                let isMine = task.userId == currentUserId
+                Circle()
+                    .fill(isMine ? Color.blue : Color.orange)
+                    .frame(width: 36, height: 36)
+                    .overlay(
+                        Text(isMine ? "Я" : "2")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    )
             } else {
-                Image(systemName: task.isCompleted || task.status == .done ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(task.status == .done ? .green : task.status == .snoozed ? .orange : task.isCompleted ? .green : .gray)
+                // Сохраняем иконку типа задачи для общего режима
+                Image(systemName: task.type.icon)
+                    .foregroundColor(.accentColor)
                     .font(.title2)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.accentColor.opacity(0.12)))
             }
-            Image(systemName: task.type.icon)
-                .foregroundColor(.accentColor)
-                .font(.title2)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Color.accentColor.opacity(0.12)))
-            
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
+                    // Иконка выполненной задачи
+                    if (task.isCompleted || task.status == .done) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(isIndividual ? (task.userId == currentUserId ? .green : .purple) : .green)
+                    }
                     Text(task.title)
                         .font(.headline)
-                        .foregroundColor(task.status == .cancelled ? .red : .primary)
+                        .foregroundColor(
+                            (task.isCompleted || task.status == .done) ?
+                                (isIndividual ? (task.userId == currentUserId ? .green : .purple) : .green)
+                                : (task.status == .cancelled ? .red : .primary)
+                        )
                         .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
-                    
-                    if isIndividual {
-                        Image(systemName: task.userId == currentUserId ? "person.fill" : "person.2.fill")
-                            .foregroundColor(task.userId == currentUserId ? .blue : .purple)
+                }
+                // Подпись под задачей в индивидуальном режиме
+                if isIndividual {
+                    if task.userId == currentUserId {
+                        Text("Вы")
                             .font(.caption)
+                            .foregroundColor(.blue)
+                    } else if let name = userName {
+                        Text(name)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text("Другой участник")
+                            .font(.caption)
+                            .foregroundColor(.orange)
                     }
                 }
-                
                 if let description = task.description, !description.isEmpty {
                     Text(description)
                         .font(.subheadline)
                         .foregroundColor(task.status == .cancelled ? .red : .secondary)
                         .strikethrough(task.isCompleted || task.status == .done || task.status == .cancelled)
                 }
-                
                 if let time = task.time {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
@@ -278,6 +307,7 @@ struct TaskRow: View {
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(backgroundColor)
+                .shadow(color: isIndividual ? Color(.black).opacity(0.04) : .clear, radius: 2, x: 0, y: 1)
         )
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)

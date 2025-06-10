@@ -5,7 +5,14 @@ import UserNotifications
 @main
 struct PairPlanApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var isAuthenticated: Bool = false
+    // Новый enum для этапов аутентификации
+    enum AuthStage {
+        case auth
+        case username(userId: String, email: String)
+        case main
+    }
+    @State private var authStage: AuthStage = .auth
+    @State private var appColorScheme: ColorScheme? = nil // Новый state для темы
     
     init() {
         // Запрашиваем разрешение на уведомления при запуске приложения
@@ -16,27 +23,56 @@ struct PairPlanApp: App {
                 print("Ошибка при запросе разрешения на уведомления: \(error)")
             }
         }
+        // Чтение темы из UserDefaults
+        if let saved = UserDefaults.standard.string(forKey: "PairPlan.AppColorScheme") {
+            switch saved {
+            case "light": self._appColorScheme = State(initialValue: .light)
+            case "dark": self._appColorScheme = State(initialValue: .dark)
+            default: self._appColorScheme = State(initialValue: nil)
+            }
+        }
     }
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if isAuthenticated {
+                switch authStage {
+                case .auth:
+                    AuthView(isAuthenticated: .constant(false), onRegisterSuccess: { userId, email in
+                        authStage = .username(userId: userId, email: email)
+                    })
+                case .username(let userId, let email):
+                    UsernameView(userId: userId, email: email) {
+                        authStage = .main
+                    }
+                case .main:
                     SessionView(onLogout: {
                         do {
                             try AuthManager.shared.logout()
                         } catch {
                             print("Ошибка выхода из аккаунта:", error)
                         }
-                        isAuthenticated = false
-                    })
+                        authStage = .auth
+                    }, appColorScheme: $appColorScheme)
                     .environmentObject(SessionViewModel())
-                } else {
-                    AuthView(isAuthenticated: $isAuthenticated)
                 }
             }
+            .preferredColorScheme(appColorScheme)
             .onAppear {
-                isAuthenticated = AuthManager.shared.currentUser != nil
+                if let user = AuthManager.shared.currentUser {
+                    // Проверяем, есть ли username в Firestore
+                    FirestoreManager.shared.getUsername(userId: user.uid) { username in
+                        DispatchQueue.main.async {
+                            if let _ = username {
+                                authStage = .main
+                            } else {
+                                authStage = .username(userId: user.uid, email: user.email ?? "")
+                            }
+                        }
+                    }
+                } else {
+                    authStage = .auth
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ enum TaskStatus: String, Codable {
     case done
 }
 
-struct Task: Identifiable, Codable {
+struct Task: Identifiable, Codable, Equatable {
     var id: String
     var title: String
     var type: TaskType

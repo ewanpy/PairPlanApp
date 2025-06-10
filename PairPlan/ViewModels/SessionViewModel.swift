@@ -17,6 +17,9 @@ class SessionViewModel: ObservableObject {
 
     @Published var mySessions: [Session] = []
 
+    // Кэш userId -> username
+    @Published var userIdToUsername: [String: String] = [:]
+
     init() {
         // При первом запуске сохраняем UUID, затем читаем его при каждом старте
         if let saved = UserDefaults.standard.string(forKey: userIdKey) {
@@ -167,6 +170,20 @@ class SessionViewModel: ObservableObject {
                     self?.mySessions.removeAll { $0.code == session.code }
                     // Удаляем из недавних сессий
                     self?.removeRecentSession(session.code)
+                }
+            }
+        }
+    }
+
+    // Загрузить username для всех userId, кроме текущего
+    func fetchUsernamesIfNeeded(for tasks: [Task]) {
+        let userIds = Set(tasks.map { $0.userId }).subtracting([currentUserId])
+        for userId in userIds where userIdToUsername[userId] == nil {
+            FirestoreManager.shared.getUsername(userId: userId) { [weak self] username in
+                DispatchQueue.main.async {
+                    if let username = username {
+                        self?.userIdToUsername[userId] = username
+                    }
                 }
             }
         }

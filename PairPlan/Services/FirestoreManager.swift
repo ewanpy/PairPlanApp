@@ -269,4 +269,31 @@ class FirestoreManager {
             }
         }
     }
+    
+    // Получить email пользователя по userId
+    func getUserEmail(userId: String, completion: @escaping (String?) -> Void) {
+        db.collection("users").document(userId).getDocument { snapshot, error in
+            if let data = snapshot?.data(), let email = data["email"] as? String {
+                completion(email)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+    
+    // Получить username пользователя по userId
+    func getUsername(userId: String, completion: @escaping (String?) -> Void) {
+        db.collection("users").document(userId).getDocument { snapshot, error in
+            if let data = snapshot?.data(), let username = data["username"] as? String {
+                completion(username)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+    
+    // Публичный доступ к коллекции users
+    func usersCollection() -> CollectionReference {
+        db.collection("users")
+    }
 }

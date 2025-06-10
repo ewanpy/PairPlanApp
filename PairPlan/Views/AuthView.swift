@@ -7,6 +7,10 @@ struct AuthView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @Binding var isAuthenticated: Bool
+    @State private var showUsernameView = false
+    @State private var newUserId: String? = nil
+    @State private var newUserEmail: String? = nil
+    var onRegisterSuccess: ((String, String) -> Void)? = nil
 
     var body: some View {
         ZStack {
@@ -72,7 +76,7 @@ struct AuthView: View {
                                 switch result {
                                 case .success(let user):
                                     UserDefaults.standard.set(user.uid, forKey: "PairPlan.currentUserId")
-                                    isAuthenticated = true
+                                    onRegisterSuccess?(user.uid, user.email ?? "")
                                 case .failure(let error):
                                     if isLogin, let err = error as NSError?, err.domain == "FIRAuthErrorDomain" && (err.code == 17009 || err.code == 17008 || err.code == 17011) {
                                         errorMessage = "Неверный email или пароль. Пожалуйста, попробуйте снова."
