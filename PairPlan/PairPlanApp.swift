@@ -42,11 +42,17 @@ struct PairPlanApp: App {
                         authStage = .username(userId: userId, email: email)
                     })
                 case .username(let userId, let email):
-                    UsernameView(userId: userId, email: email) {
-                        authStage = .main
-                    }
+                    UsernameView(
+                        userId: userId,
+                        email: email,
+                        onComplete: { authStage = .main },
+                        onCancel: { authStage = .auth }
+                    )
                 case .main:
                     SessionView(onLogout: {
+                        // Очищаем все локальные уведомления
+                        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+                        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
                         do {
                             try AuthManager.shared.logout()
                         } catch {

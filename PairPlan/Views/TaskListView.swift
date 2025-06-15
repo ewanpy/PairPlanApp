@@ -25,6 +25,8 @@ struct TaskListView: View {
     @State private var editingChecklistTask: Task? = nil
     /// Выбранный день недели (1 = Пн, 7 = Вс)
     @State private var selectedWeekday: Int = 1 // по умолчанию Пн
+    /// Флаг отображения предупреждения удаления всех задач за выбранный день
+    @State private var showDeleteDayAlert = false
     /// Текущий пользователь (id)
     private var currentUserId: String {
         UserDefaults.standard.string(forKey: "PairPlan.currentUserId") ?? ""
@@ -32,54 +34,102 @@ struct TaskListView: View {
     /// Доступ к SessionViewModel для username-кэша
     @EnvironmentObject var sessionVM: SessionViewModel
     
+    // Добавляю computed property для элементов таймлайна
+    private var timelineItems: [AnyView] {
+        let filteredTasks = viewModel.tasks
+            .filter { $0.weekday == selectedWeekday }
+            .sorted {
+                switch ($0.time, $1.time) {
+                case let (t0?, t1?): return t0 < t1
+                case (nil, nil): return $0.timestamp > $1.timestamp
+                case (nil, _?): return false
+                case (_?, nil): return true
+                }
+            }
+        let calendar = Calendar.current
+        var lastEndTime: Date? = nil
+        var items: [AnyView] = []
+        for task in filteredTasks {
+            guard let start = task.time else {
+                items.append(AnyView(TaskRow(
+                    task: task,
+                    currentUserId: currentUserId,
+                    sessionCode: sessionCode,
+                    onToggleComplete: { viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task) },
+                    isIndividual: mode == .individual,
+                    previousUserId: nil,
+                    onEdit: { editingTask = task },
+                    onDelete: { deleteTaskById(task.id) },
+                    onChecklist: { checklistTask = task },
+                    onEditChecklist: { editingChecklistTask = task },
+                    userName: sessionVM.userIdToUsername[task.userId]
+                )))
+                continue
+            }
+            let end = task.endTime ?? calendar.date(byAdding: .hour, value: 1, to: start)!
+            if let last = lastEndTime, last < start {
+                items.append(AnyView(FreeTimeRow(start: last, end: start)))
+            } else if lastEndTime == nil && start > calendar.startOfDay(for: start) {
+                let dayStart = calendar.startOfDay(for: start)
+                items.append(AnyView(FreeTimeRow(start: dayStart, end: start)))
+            }
+            items.append(AnyView(TaskRow(
+                task: task,
+                currentUserId: currentUserId,
+                sessionCode: sessionCode,
+                onToggleComplete: { viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task) },
+                isIndividual: mode == .individual,
+                previousUserId: nil,
+                onEdit: { editingTask = task },
+                onDelete: { deleteTaskById(task.id) },
+                onChecklist: { checklistTask = task },
+                onEditChecklist: { editingChecklistTask = task },
+                userName: sessionVM.userIdToUsername[task.userId]
+            )))
+            lastEndTime = end
+        }
+        if let last = lastEndTime {
+            let dayEnd = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: last)!
+            if last < dayEnd {
+                items.append(AnyView(FreeTimeRow(start: last, end: dayEnd)))
+            }
+        }
+        return items
+    }
+    
     var body: some View {
         VStack {
             // Меню выбора дня недели с визуализацией статуса дней
             WeekdayPicker(selectedWeekday: $selectedWeekday)
             
+            // Кнопка очистки задач за день
+            if !viewModel.tasks.filter({ $0.weekday == selectedWeekday }).isEmpty {
+                Button(role: .destructive) {
+                    showDeleteDayAlert = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Очистить все задачи")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+                .alert("Удалить все задачи за этот день?", isPresented: $showDeleteDayAlert) {
+                    Button("Удалить", role: .destructive) {
+                        deleteAllTasksForSelectedDay()
+                    }
+                    Button("Отмена", role: .cancel) {}
+                }
+            }
+            
             // Список задач, отфильтрованный по дню недели, отсортированный по времени
             List {
-                // Фильтрация и сортировка задач
-                let filteredTasks = viewModel.tasks
-                    .filter { $0.weekday == selectedWeekday }
-                    .sorted {
-                        // Сортировка по времени в формате 24 часа
-                        switch ($0.time, $1.time) {
-                        case let (t0?, t1?):
-                            // Если у обеих задач есть время, сравниваем их
-                            return t0 < t1
-                        case (nil, nil):
-                            // Если у обеих задач нет времени, сортируем по времени создания
-                            return $0.timestamp > $1.timestamp
-                        case (nil, _?):
-                            // Задачи без времени идут в конец
-                            return false
-                        case (_?, nil):
-                            // Задачи с временем идут в начало
-                            return true
-                        }
-                    }
-                // Отображение каждой задачи через TaskRow
-                ForEach(filteredTasks) { task in
-                    TaskRow(
-                        task: task,
-                        currentUserId: currentUserId,
-                        sessionCode: sessionCode,
-                        onToggleComplete: {
-                            viewModel.toggleTaskCompletion(sessionCode: sessionCode, task: task)
-                        },
-                        isIndividual: mode == .individual,
-                        previousUserId: nil, // Можно реализовать если нужно
-                        onEdit: { editingTask = task },
-                        onDelete: { deleteTaskById(task.id) },
-                        onChecklist: { checklistTask = task },
-                        onEditChecklist: {
-                            editingChecklistTask = task
-                        },
-                        userName: sessionVM.userIdToUsername[task.userId]
-                    )
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+                ForEach(Array(timelineItems.enumerated()), id: \.offset) { pair in
+                    let view = pair.element
+                    view
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             }
             .listStyle(PlainListStyle())
@@ -177,6 +227,14 @@ struct TaskListView: View {
     // Возвращает текущий год
     func getCurrentYear() -> Int {
         Calendar.current.component(.year, from: Date())
+    }
+
+    // Функция удаления всех задач за выбранный день
+    private func deleteAllTasksForSelectedDay() {
+        let dayTasks = viewModel.tasks.filter { $0.weekday == selectedWeekday }
+        for task in dayTasks {
+            deleteTaskById(task.id)
+        }
     }
 }
 
@@ -412,5 +470,43 @@ struct WeekdayPicker: View {
     func getCurrentWeekday() -> Int {
         let weekday = Calendar.current.component(.weekday, from: Date())
         return weekday == 1 ? 7 : weekday - 1
+    }
+}
+
+// Добавляю компонент для отображения свободного времени
+struct FreeTimeRow: View {
+    let start: Date
+    let end: Date
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock")
+                .foregroundColor(.gray)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Color(.systemGray5)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Свободное время")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                HStack(spacing: 4) {
+                    Text(start, style: .time)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text("-")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text(end, style: .time)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            Spacer()
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(.systemGray6))
+        )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
     }
 }
